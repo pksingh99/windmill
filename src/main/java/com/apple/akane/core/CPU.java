@@ -1,11 +1,15 @@
 package com.apple.akane.core;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
 import com.apple.akane.core.tasks.Task0;
 import com.apple.akane.core.tasks.Task1;
+import com.apple.akane.core.tasks.VoidTask;
+import com.apple.akane.net.Channel;
 import com.apple.akane.net.Network;
 
+import com.apple.akane.utils.IOUtils;
 import com.lmax.disruptor.BusySpinWaitStrategy;
 import com.lmax.disruptor.EventPoller;
 import com.lmax.disruptor.EventPoller.PollState;
@@ -33,6 +37,11 @@ public class CPU implements Runnable
     {
         runQueue = RingBuffer.create(ProducerType.MULTI, WorkEvent::new, 1 << 20, new BusySpinWaitStrategy());
         network = new Network(this);
+    }
+
+    public void listen(InetSocketAddress address, VoidTask<Channel> onAccept) throws IOException
+    {
+        network.listen(address, onAccept);
     }
 
     public <O> Future<O> schedule(Task0<O> task)
@@ -79,6 +88,8 @@ public class CPU implements Runnable
                 logger.error("task failed", e);
             }
         }
+
+        IOUtils.closeQuietly(network);
     }
 
     public void halt()
