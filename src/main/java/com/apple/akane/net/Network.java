@@ -1,5 +1,6 @@
 package com.apple.akane.net;
 
+import java.io.IOError;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
@@ -16,15 +17,15 @@ public class Network implements AutoCloseable
     protected final CPU cpu;
     protected final Selector selector;
 
-    public Network(CPU cpu) throws IOException
+    public Network(CPU cpu)
     {
         this.cpu = cpu;
-        this.selector = SelectorProvider.provider().openSelector();
+        this.selector = openSelector();
     }
 
-    public ServerSocket listen(InetSocketAddress address, VoidTask<Channel> onAccept) throws IOException
+    public ServerSocket listen(InetSocketAddress address, VoidTask<Channel> onAccept, VoidTask<Throwable> onFailure) throws IOException
     {
-        return new ServerSocket(cpu, selector, address, onAccept);
+        return new ServerSocket(cpu, selector, address, onAccept, onFailure);
     }
 
     public void poll() throws IOException
@@ -65,5 +66,22 @@ public class Network implements AutoCloseable
     public void close()
     {
         IOUtils.closeQuietly(selector);
+    }
+
+    public Selector getSelector()
+    {
+        return selector;
+    }
+
+    private static Selector openSelector()
+    {
+        try
+        {
+            return SelectorProvider.provider().openSelector();
+        }
+        catch (IOException e)
+        {
+            throw new IOError(e);
+        }
     }
 }

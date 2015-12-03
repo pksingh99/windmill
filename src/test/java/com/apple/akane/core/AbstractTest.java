@@ -5,19 +5,19 @@ import org.junit.BeforeClass;
 
 public class AbstractTest
 {
-    protected static CPU CPU;
+    protected static CPUSet CPUs;
 
     @BeforeClass
     public static void before() throws Exception
     {
-        CPU = new CPU();
-        new Thread(CPU).start();
+        CPUs = CPUSet.builder().addPack(0).build();
+        CPUs.start();
     }
 
     @AfterClass
     public static void after()
     {
-        CPU.halt();
+        CPUs.halt();
     }
 
     public static class ConstantFuture<T> extends Future<T>

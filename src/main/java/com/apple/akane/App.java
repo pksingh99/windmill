@@ -4,6 +4,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.apple.akane.core.CPU;
+import com.apple.akane.core.CPUSet;
 import com.apple.akane.core.tasks.Task0;
 import com.apple.akane.net.io.InputStream;
 import com.apple.akane.net.io.OutputStream;
@@ -14,11 +15,12 @@ public class App
 {
     public static void main(String[] args) throws Exception
     {
-        CPU cpu0 = new CPU();
-        CPU cpu1 = new CPU();
+        CPUSet cpus = CPUSet.builder().addPack(0, 1).build();
 
-        new Thread(cpu0).start();
-        new Thread(cpu1).start();
+        cpus.start();
+
+        CPU cpu0 = cpus.get(0);
+        CPU cpu1 = cpus.get(1);
 
         cpu0.schedule(sum(new int[] { 1, 2, 3 })).onSuccess(System.out::println);
         cpu1.schedule(sum(new int[] { 4, 5, 6 })).onSuccess(System.out::println);
@@ -51,7 +53,7 @@ public class App
                                              output.writeAndFlush(Unpooled.buffer(12).writeInt(sum).writeLong(timestamp));
                                          }));
 
-        });
+        }, Throwable::printStackTrace);
 
         cpu0.schedule(sum(new int[] { 10, 11, 12 })).map(cpu1, (sum) -> Integer.toString(sum)).onSuccess(System.out::println);
 

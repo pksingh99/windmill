@@ -16,7 +16,7 @@ public class FutureTest extends AbstractTest
     @Test(expected = IllegalStateException.class)
     public void testGetOnUnresolvedFuture()
     {
-        new Future<>(CPU).get();
+        new Future<>(CPUs.get(0)).get();
     }
 
     @Test
@@ -48,7 +48,9 @@ public class FutureTest extends AbstractTest
     @Test
     public void testMap()
     {
-        Future<Integer> futureA = new Future<>(CPU);
+        CPU cpu = CPUs.get(0);
+
+        Future<Integer> futureA = new Future<>(cpu);
 
         AtomicInteger result = new AtomicInteger(0);
 
@@ -56,7 +58,7 @@ public class FutureTest extends AbstractTest
 
         futureA.map((n) -> mapTask(result, latchA).compute(n));
 
-        setValue(CPU, futureA, 42);
+        setValue(cpu, futureA, 42);
 
         Uninterruptibles.awaitUninterruptibly(latchA);
         Assert.assertEquals(42, result.get());
@@ -75,13 +77,13 @@ public class FutureTest extends AbstractTest
         result.set(0);
 
         CountDownLatch latchC = new CountDownLatch(2);
-        Future<Integer> futureB = new Future<>(CPU);
+        Future<Integer> futureB = new Future<>(cpu);
 
         // multiple map tasks with unfulfilled future
         futureB.map((n) -> mapTask(result, latchC).compute(n));
         futureB.map((n) -> mapTask(result, latchC).compute(n));
 
-        setValue(CPU, futureB, 1);
+        setValue(cpu, futureB, 1);
 
         Uninterruptibles.awaitUninterruptibly(latchC);
         Assert.assertEquals(2, result.get());
@@ -90,7 +92,9 @@ public class FutureTest extends AbstractTest
     @Test
     public void testFlatMap()
     {
-        Future<Future<Integer>> futureA = new Future<>(CPU);
+        CPU cpu = CPUs.get(0);
+
+        Future<Future<Integer>> futureA = new Future<>(cpu);
         CountDownLatch latchA = new CountDownLatch(1);
 
         AtomicInteger result = new AtomicInteger(0);
@@ -104,12 +108,12 @@ public class FutureTest extends AbstractTest
             return null;
         });
 
-        setValue(CPU, futureA, new Future<Integer>(CPU) {{ setValue(42); }});
+        setValue(cpu, futureA, new Future<Integer>(cpu) {{ setValue(42); }});
 
         Uninterruptibles.awaitUninterruptibly(latchA);
         Assert.assertEquals(42, result.get());
 
-        Future<Future<Integer>> futureB = new Future<>(CPU);
+        Future<Future<Integer>> futureB = new Future<>(cpu);
         CountDownLatch latchB = new CountDownLatch(1);
 
         futureB.flatMap((o) -> {
@@ -121,7 +125,7 @@ public class FutureTest extends AbstractTest
             return null;
         });
 
-        setValue(CPU, futureB, new Future<Integer>(CPU) {{ setFailure(new RuntimeException()); }});
+        setValue(cpu, futureB, new Future<Integer>(cpu) {{ setFailure(new RuntimeException()); }});
 
         Uninterruptibles.awaitUninterruptibly(latchB);
         Assert.assertEquals(RuntimeException.class, failure.get().getClass());
@@ -130,7 +134,9 @@ public class FutureTest extends AbstractTest
     @Test
     public void testOnSuccess()
     {
-        Future<Integer> futureA = new Future<>(CPU);
+        CPU cpu = CPUs.get(0);
+
+        Future<Integer> futureA = new Future<>(cpu);
 
         AtomicInteger result = new AtomicInteger(0);
 
@@ -138,7 +144,7 @@ public class FutureTest extends AbstractTest
 
         futureA.onSuccess((n) -> mapTask(result, latchA).compute(n));
 
-        setValue(CPU, futureA, 42);
+        setValue(cpu, futureA, 42);
 
         Uninterruptibles.awaitUninterruptibly(latchA);
         Assert.assertEquals(42, result.get());
@@ -157,13 +163,13 @@ public class FutureTest extends AbstractTest
         result.set(0);
 
         CountDownLatch latchC = new CountDownLatch(2);
-        Future<Integer> futureB = new Future<>(CPU);
+        Future<Integer> futureB = new Future<>(cpu);
 
         // multiple map tasks with unfulfilled future
         futureB.onSuccess((n) -> mapTask(result, latchC).compute(n));
         futureB.onSuccess((n) -> mapTask(result, latchC).compute(n));
 
-        setValue(CPU, futureB, 1);
+        setValue(cpu, futureB, 1);
 
         Uninterruptibles.awaitUninterruptibly(latchC);
         Assert.assertEquals(2, result.get());
@@ -172,16 +178,18 @@ public class FutureTest extends AbstractTest
     @Test
     public void testOnFailure()
     {
+        CPU cpu = CPUs.get(0);
+
         AtomicReference<Throwable> exception = new AtomicReference<>();
 
-        Future<Integer> failedFuture = new Future<>(CPU);
+        Future<Integer> failedFuture = new Future<>(cpu);
         CountDownLatch latchA = new CountDownLatch(1);
 
         failedFuture.onFailure((e) -> {
             exceptionTask(exception, latchA).compute(e);
         });
 
-        setFailure(CPU, failedFuture, new IllegalArgumentException());
+        setFailure(cpu, failedFuture, new IllegalArgumentException());
 
         Uninterruptibles.awaitUninterruptibly(latchA);
 
@@ -215,12 +223,12 @@ public class FutureTest extends AbstractTest
         universalNumber.set(0);
         CountDownLatch latchD = new CountDownLatch(1);
 
-        Future<Integer> unresolvedFailure = new Future<>(CPU);
+        Future<Integer> unresolvedFailure = new Future<>(cpu);
         unresolvedFailure.onFailure((e) -> 42).onSuccess((n) -> mapTask(universalNumber, latchD).compute(n));
 
         Assert.assertEquals(0, universalNumber.get());
 
-        setFailure(CPU, unresolvedFailure, new RuntimeException());
+        setFailure(cpu, unresolvedFailure, new RuntimeException());
 
         Uninterruptibles.awaitUninterruptibly(latchD);
         Assert.assertEquals(42, universalNumber.get());
@@ -229,7 +237,7 @@ public class FutureTest extends AbstractTest
     @Test
     public void testCheckState()
     {
-        Future<Integer> future = new Future<>(CPU);
+        Future<Integer> future = new Future<>(CPUs.get(0));
 
         try
         {
@@ -252,7 +260,7 @@ public class FutureTest extends AbstractTest
 
         CountDownLatch latch = new CountDownLatch(1);
 
-        CPU.schedule(() -> {
+        CPUs.get(0).schedule(() -> {
             try
             {
                 future.setValue(42);

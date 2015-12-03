@@ -22,7 +22,7 @@ public class CPUTest extends AbstractTest
     {
         CountDownLatch latch = new CountDownLatch(10);
 
-        CPU.loop((cpu) -> {
+        CPUs.get(0).loop((cpu) -> {
             try
             {
                 return (latch.getCount() == 0)
@@ -42,7 +42,7 @@ public class CPUTest extends AbstractTest
     public void testListen() throws Exception
     {
         // non-blocking server which takes frame consisting
-        CPU.listen(new InetSocketAddress("localhost", 31337), (c) -> {
+        CPUs.get(0).listen(new InetSocketAddress("localhost", 31337), (c) -> {
             InputStream   input = c.getInput();
             OutputStream output = c.getOutput();
 
@@ -55,7 +55,7 @@ public class CPUTest extends AbstractTest
                                              output.writeAndFlush(Unpooled.buffer(12).writeInt(sum))
                                                    .onSuccess((bytesWritten) -> Assert.assertEquals(4, bytesWritten.intValue()));
                                          }));
-        });
+        }, Throwable::printStackTrace);
 
 
         try (Socket client = new Socket("localhost", 31337))
