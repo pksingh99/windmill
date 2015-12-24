@@ -17,7 +17,7 @@ public class OutputStream implements AutoCloseable
     private final CPU cpu;
     private final SelectionKey key;
     private final SocketChannel channel;
-    private final Queue<TransferTask<Integer>> txQueue;
+    private final Queue<TxTask> txQueue;
 
     public OutputStream(CPU cpu, SelectionKey key, SocketChannel channel)
     {
@@ -50,7 +50,7 @@ public class OutputStream implements AutoCloseable
     {
         while (!txQueue.isEmpty())
         {
-            TransferTask<Integer> task = txQueue.peek();
+            TxTask task = txQueue.peek();
 
             if (!task.compute(channel))
                 return;
@@ -69,7 +69,7 @@ public class OutputStream implements AutoCloseable
             txQueue.poll().close();
     }
 
-    private static class TxTask extends TransferTask<Integer>
+    private static class TxTask extends TransferTask<SocketChannel, Integer>
     {
         public TxTask(ByteBuf buffer, Future<Integer> future)
         {
