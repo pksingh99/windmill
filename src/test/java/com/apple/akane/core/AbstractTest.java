@@ -10,7 +10,7 @@ public class AbstractTest
     @BeforeClass
     public static void before() throws Exception
     {
-        CPUs = CPUSet.builder().addPack(0).build();
+        CPUs = CPUSet.builder().addSocket(0).build();
         CPUs.start();
     }
 

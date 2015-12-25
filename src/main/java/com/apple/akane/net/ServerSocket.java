@@ -36,7 +36,7 @@ public class ServerSocket implements AutoCloseable
 
     protected void onAccept() throws IOException
     {
-        cpu.getPack().register(channel.accept(), onAccept, onFailure);
+        cpu.getSocket().register(channel.accept(), onAccept, onFailure);
     }
 
     @Override

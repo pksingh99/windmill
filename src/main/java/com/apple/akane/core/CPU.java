@@ -32,14 +32,14 @@ public class CPU
     private volatile boolean isHalted = false;
 
     protected final int id;
-    protected final CPUSet.Pack pack;
+    protected final CPUSet.Socket socket;
     protected final RingBuffer<WorkEvent> runQueue;
     protected final Network network;
 
-    CPU(int cpuId, CPUSet.Pack cpuPack)
+    CPU(int cpuId, CPUSet.Socket socket)
     {
         id = cpuId;
-        pack = cpuPack;
+        this.socket = socket;
         runQueue = RingBuffer.create(ProducerType.MULTI, WorkEvent::new, 1 << 20, new BusySpinWaitStrategy());
         network = new Network(this);
     }
@@ -76,9 +76,9 @@ public class CPU
         return promise.getFuture();
     }
 
-    public CPUSet.Pack getPack()
+    public CPUSet.Socket getSocket()
     {
-        return pack;
+        return socket;
     }
 
     protected Selector getSelector()

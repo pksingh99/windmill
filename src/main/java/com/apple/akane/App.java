@@ -15,7 +15,7 @@ public class App
 {
     public static void main(String[] args) throws Exception
     {
-        CPUSet cpus = CPUSet.builder().addPack(0, 1).build();
+        CPUSet cpus = CPUSet.builder().addSocket(0, 1).build();
 
         cpus.start();
 

@@ -11,16 +11,16 @@ import com.google.common.collect.*;
 
 public class CPUSet
 {
-    private final ImmutableMap<Integer, Pack> nodes;
+    private final ImmutableMap<Integer, Socket> sockets;
     private final ImmutableList<CPU> cpus;
 
-    private CPUSet(ImmutableMap<Integer, Pack> nodes)
+    private CPUSet(ImmutableMap<Integer, Socket> sockets)
     {
         ImmutableList.Builder<CPU> cpus = ImmutableList.builder();
-        for (Pack pack : nodes.values())
-            cpus.addAll(pack.cpus);
+        for (Socket socket : sockets.values())
+            cpus.addAll(socket.cpus);
 
-        this.nodes = nodes;
+        this.sockets = sockets;
         this.cpus = cpus.build();
     }
 
@@ -29,19 +29,19 @@ public class CPUSet
         return cpus.get(cpuId);
     }
 
-    public Pack getNUMANode(int id)
+    public Socket getSocket(int id)
     {
-        return nodes.get(id);
+        return sockets.get(id);
     }
 
     public void start()
     {
-        cpus.stream().forEach(CPU::start);
+        sockets.values().stream().forEach(Socket::start);
     }
 
     public void halt()
     {
-        cpus.stream().forEach(CPU::halt);
+        sockets.values().stream().forEach(Socket::halt);
     }
 
     public static Builder builder()
@@ -51,32 +51,42 @@ public class CPUSet
 
     public static class Builder
     {
-        private int packId = 0;
-        private final ImmutableMap.Builder<Integer, Pack> nodes = ImmutableMap.builder();
+        private int socketId = 0;
+        private final ImmutableMap.Builder<Integer, Socket> sockets = ImmutableMap.builder();
 
-        public Builder addPack(int... cpuIds)
+        public Builder addSocket(int... cpuIds)
         {
-            nodes.put(packId++, new Pack(cpuIds));
+            sockets.put(socketId++, new Socket(cpuIds));
             return this;
         }
 
         public CPUSet build()
         {
-            return new CPUSet(nodes.build());
+            return new CPUSet(sockets.build());
         }
     }
 
-    public static class Pack
+    public static class Socket
     {
         private final List<CPU> cpus;
 
-        private Pack(int... cpuIds)
+        private Socket(int... cpuIds)
         {
             ImmutableList.Builder<CPU> cpus = ImmutableList.builder();
             for (int cpuId : cpuIds)
                 cpus.add(new CPU(cpuId, this));
 
             this.cpus = cpus.build();
+        }
+
+        public void start()
+        {
+            cpus.stream().forEach(CPU::start);
+        }
+
+        public void halt()
+        {
+            cpus.stream().forEach(CPU::halt);
         }
 
         public CPU getCPU()
