@@ -17,6 +17,9 @@ import com.lmax.disruptor.EventPoller.PollState;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.ProducerType;
 
+import net.openhft.affinity.AffinitySupport;
+import net.openhft.affinity.CpuLayout;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,17 +34,19 @@ public class CPU
 
     private volatile boolean isHalted = false;
 
+    protected final CpuLayout layout;
     protected final int id;
     protected final CPUSet.Socket socket;
     protected final RingBuffer<WorkEvent> runQueue;
     protected final Network network;
 
-    CPU(int cpuId, CPUSet.Socket socket)
+    CPU(CpuLayout layout, int cpuId, CPUSet.Socket socket)
     {
-        id = cpuId;
+        this.layout = layout;
+        this.id = cpuId;
         this.socket = socket;
-        runQueue = RingBuffer.create(ProducerType.MULTI, WorkEvent::new, 1 << 20, new BusySpinWaitStrategy());
-        network = new Network(this);
+        this.runQueue = RingBuffer.create(ProducerType.MULTI, WorkEvent::new, 1 << 20, new BusySpinWaitStrategy());
+        this.network = new Network(this);
     }
 
     public void listen(InetSocketAddress address, VoidTask<Channel> onAccept, VoidTask<Throwable> onFailure) throws IOException
@@ -93,6 +98,9 @@ public class CPU
 
     protected void run()
     {
+        if (layout != null)
+            AffinitySupport.setAffinity(1L << id);
+
         EventPoller<WorkEvent> poller = runQueue.newPoller();
 
         while (!isHalted)

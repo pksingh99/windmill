@@ -10,7 +10,7 @@ public class CPUSetTest
     @Test
     public void testGetCPUs()
     {
-        CPUSet cpus = CPUSet.builder().addSocket(0, 1, 2).addSocket(3, 4, 5).build();
+        CPUSet cpus = new CPUSet.Builder(null).addSocket(0, 1, 2).addSocket(3, 4, 5).build();
         for (int i = 0; i < 6; i++)
             Assert.assertNotNull(cpus.get(ThreadLocalRandom.current().nextInt(0, 6)));
     }
@@ -18,7 +18,7 @@ public class CPUSetTest
     @Test
     public void testNUMANode()
     {
-        CPUSet cpus = CPUSet.builder().addSocket(0, 1).addSocket(2, 3, 4).build();
+        CPUSet cpus = new CPUSet.Builder(null).addSocket(0, 1).addSocket(2, 3, 4).build();
 
         CPUSet.Socket socket0 = cpus.getSocket(0);
         CPUSet.Socket socket1 = cpus.getSocket(1);
