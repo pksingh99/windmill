@@ -3,6 +3,9 @@ package com.apple.akane.core;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.Selector;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
 
 import com.apple.akane.core.tasks.Task0;
 import com.apple.akane.core.tasks.Task1;
@@ -45,6 +48,7 @@ public class CPU
     protected final RingBuffer<WorkEvent> runQueue;
     protected final IOService io;
     protected final Network network;
+    protected final DelayQueue<TimerTask> timers;
 
     CPU(CpuLayout layout, int cpuId, CPUSet.Socket socket)
     {
@@ -54,6 +58,7 @@ public class CPU
         this.runQueue = RingBuffer.create(ProducerType.MULTI, WorkEvent::new, 1 << 20, new BusySpinWaitStrategy());
         this.io = new IOService(this, DEFAULT_IO_THREADS);
         this.network = new Network(this);
+        this.timers = new DelayQueue<>();
     }
 
     public int getId()
@@ -79,6 +84,13 @@ public class CPU
     public <O> void loop(Task1<CPU, Future<O>> task)
     {
         schedule(() -> task.compute(this).onSuccess((o) -> loop(task)));
+    }
+
+    public <O> Future<O> sleep(long duration, TimeUnit unit, Task0<O> then)
+    {
+        Promise<O> promise = new Promise<>(this, then);
+        timers.add(new TimerTask<>(unit.toNanos(duration), promise));
+        return promise.getFuture();
     }
 
     public Future<File> open(String path, String mode)
@@ -136,6 +148,8 @@ public class CPU
             {
                 if (poller.poll(HANDLER) != PollState.PROCESSING)
                     network.poll();
+
+                processTimers();
             }
             catch (Exception e)
             {
@@ -145,6 +159,18 @@ public class CPU
 
         IOUtils.closeQuietly(io);
         IOUtils.closeQuietly(network);
+    }
+
+    protected void processTimers()
+    {
+        for (;;)
+        {
+            TimerTask<?> task = timers.poll();
+            if (task == null)
+                break;
+
+            schedule(task.promise);
+        }
     }
 
     public void halt()
@@ -165,6 +191,36 @@ public class CPU
         {
             promise.fulfil();
             promise = null; // release a reference to already processed promise
+        }
+    }
+
+    private static class TimerTask<O> implements Delayed
+    {
+        private final long startTime;
+        private final Promise<O> promise;
+
+        public TimerTask(long delayNanos, Promise<O> promise)
+        {
+            this.startTime = System.nanoTime() + delayNanos;
+            this.promise = promise;
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit)
+        {
+            return unit.convert(startTime - System.nanoTime(), TimeUnit.NANOSECONDS);
+        }
+
+        @Override
+        public int compareTo(Delayed other)
+        {
+            if (other == null || !(other instanceof TimerTask))
+                return -1;
+
+            if (other == this)
+                return 0;
+
+            return Long.compare(startTime, ((TimerTask) other).startTime);
         }
     }
 }

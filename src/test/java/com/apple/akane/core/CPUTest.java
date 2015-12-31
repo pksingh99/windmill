@@ -3,6 +3,9 @@ package com.apple.akane.core;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.apple.akane.net.io.InputStream;
 import com.apple.akane.net.io.OutputStream;
@@ -76,6 +79,39 @@ public class CPUTest extends AbstractTest
 
             client.close();
         }
+    }
+
+    @Test
+    public void testSleep()
+    {
+        CPU cpu = CPUs.get(0);
+
+        long now = System.nanoTime();
+        AtomicInteger counts = new AtomicInteger(0);
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        for (int i = 0; i < 5; i++)
+        {
+            long delay = random.nextInt(10, 50);
+            cpu.sleep(delay, TimeUnit.MILLISECONDS, () -> {
+                long n = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - now);
+                Assert.assertTrue(n >= delay);
+                return counts.incrementAndGet();
+            });
+
+            // also insert couple of empty tasks to make
+            // sure that sleep works with other tasks around
+            cpu.schedule(() -> 2 + 2);
+        }
+
+        cpu.sleep(500, TimeUnit.MILLISECONDS, counts::incrementAndGet);
+
+        Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+        Assert.assertEquals(5, counts.get());
+
+        // sleep a bit for to get 6th count
+        Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+        Assert.assertEquals(6, counts.get());
     }
 
     private static ByteBuf getRequest(int[] numbers)
