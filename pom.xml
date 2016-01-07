@@ -1,8 +1,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.apple</groupId>
-    <artifactId>akane</artifactId>
+    <groupId>io.windmill</groupId>
+    <artifactId>core</artifactId>
     <version>0.1-SNAPSHOT</version>
     <build>
         <plugins>
@@ -20,7 +20,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.apple.akane.App</mainClass>
+                            <mainClass>io.windmill.App</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
@@ -46,8 +46,8 @@
     </build>
     <packaging>jar</packaging>
 
-    <name>akane</name>
-    <url>http://github.com/xedin/akane</url>
+    <name>windmill</name>
+    <url>http://github.com/xedin/windmill</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
