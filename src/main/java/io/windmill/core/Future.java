@@ -128,6 +128,22 @@ public class Future<O>
         map(remoteCPU, (o) -> { then.compute(o); return null; });
     }
 
+    public void onResult(VoidTask<Either<O, Throwable>> then)
+    {
+        onResult(cpu, then);
+    }
+
+    public void onResult(CPU remoteCPU, VoidTask<Either<O, Throwable>> then)
+    {
+        onSuccess(remoteCPU, v -> then.compute(Either.left(v)));
+        onFailure(remoteCPU, v -> then.compute(Either.right(v)));
+    }
+
+    public void onFailure(CPU remoteCPU, VoidTask<Throwable> continuation)
+    {
+        onFailure.onSuccess(remoteCPU, continuation);
+    }
+
     public void onFailure(VoidTask<Throwable> continuation)
     {
         onFailure.onSuccess(continuation);

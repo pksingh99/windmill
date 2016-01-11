@@ -1,6 +1,7 @@
 package io.windmill.core;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -10,9 +11,13 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FutureTest extends AbstractTest
 {
+    private static final Logger logger = LoggerFactory.getLogger(FutureTest.class);
+
     @Test(expected = IllegalStateException.class)
     public void testGetOnUnresolvedFuture()
     {
@@ -321,6 +326,20 @@ public class FutureTest extends AbstractTest
 
         Assert.assertTrue(future.isSuccess());
         Assert.assertEquals(CPUs.get(2).getId(), threadId.get());
+    }
+
+    @Test
+    public void testOnResultSuccess() throws InterruptedException
+    {
+        AtomicReference<Either<Integer, Throwable>> ref = new AtomicReference<>();
+        Future<Integer> future = new Future<>(CPUs.get(0));
+        future.setValue(42);
+        future.onResult(ref::set);
+        while (ref.get() == null)
+            TimeUnit.MILLISECONDS.sleep(50);
+        Either<Integer, Throwable> e = ref.get();
+        logger.info("Either {}", e);
+        EitherTest.assertLeft(e, 42);
     }
 
     private static <T> void setValue(CPU cpu, Future<T> future, T value)
