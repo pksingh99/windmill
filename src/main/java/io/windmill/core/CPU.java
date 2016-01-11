@@ -132,7 +132,9 @@ public class CPU
 
     public void start()
     {
-        new Thread(this::run).start();
+        Thread thread = new Thread(this::run);
+        thread.setName(id + "-app");
+        thread.start();
     }
 
     protected void run()

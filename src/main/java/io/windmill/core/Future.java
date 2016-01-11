@@ -123,6 +123,11 @@ public class Future<O>
         return map((o) -> { then.compute(o); return null; });
     }
 
+    public Future<Void> onSuccess(CPU remoteCPU, VoidTask<O> then)
+    {
+        return map(remoteCPU, (o) -> { then.compute(o); return null; });
+    }
+
     public Future<Void> onFailure(VoidTask<Throwable> continuation)
     {
         return onFailure.onSuccess(continuation);

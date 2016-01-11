@@ -1,6 +1,7 @@
 package io.windmill.core;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -108,7 +109,9 @@ public class FutureTest extends AbstractTest
             return null;
         });
 
-        setValue(cpu, futureA, new Future<Integer>(cpu) {{ setValue(42); }});
+        setValue(cpu, futureA, new Future<Integer>(cpu) {{
+            setValue(42);
+        }});
 
         Uninterruptibles.awaitUninterruptibly(latchA);
         Assert.assertEquals(42, result.get());
@@ -303,6 +306,20 @@ public class FutureTest extends AbstractTest
         {
             Assert.assertEquals(IllegalStateException.class, e.getClass());
         }
+    }
+
+    @Test
+    public void testOnSuccessDiffCPU() throws InterruptedException {
+        Future<Integer> future = new Future<>(CPUs.get(0));
+        Future<Void> sucFu = future.onSuccess(CPUs.get(2), (v) -> {
+            int expected = CPUs.get(2).getId();
+            int threadId = Integer.parseInt(Thread.currentThread().getName().split("-")[0]);
+            Assert.assertEquals(expected, threadId);
+        });
+        future.setValue(42);
+        while (!sucFu.isAvailable())
+            TimeUnit.MILLISECONDS.sleep(50);
+        Assert.assertTrue("onSuccess was not successful!", sucFu.isSuccess());
     }
 
     private static <T> void setValue(CPU cpu, Future<T> future, T value)
