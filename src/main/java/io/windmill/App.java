@@ -38,7 +38,7 @@ public class App
             AtomicInteger totalSize = new AtomicInteger(0);
 
             c.loop((cpu) -> input.read(4).flatMap((header) -> input.read(header.readInt()))
-                                         .onSuccess((msg) -> {
+                                         .map((msg) -> {
                                              int sum = 0;
                                              int count = msg.readInt();
                                              for (int i = 0; i < count; i++)
@@ -51,6 +51,7 @@ public class App
                                                  System.out.println("received " + counter + " messages, total size " + totalSize.get() + " bytes");
 
                                              output.writeAndFlush(Unpooled.buffer(12).writeInt(sum).writeLong(timestamp));
+                                             return null;
                                          }));
 
         }, Throwable::printStackTrace);

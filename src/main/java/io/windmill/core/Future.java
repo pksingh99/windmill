@@ -118,24 +118,19 @@ public class Future<O>
         return sink;
     }
 
-    public Future<Void> onSuccess(VoidTask<O> then)
+    public void onSuccess(VoidTask<O> then)
     {
-        return map((o) -> { then.compute(o); return null; });
+        map((o) -> { then.compute(o); return null; });
     }
 
-    public Future<Void> onSuccess(CPU remoteCPU, VoidTask<O> then)
+    public void onSuccess(CPU remoteCPU, VoidTask<O> then)
     {
-        return map(remoteCPU, (o) -> { then.compute(o); return null; });
+        map(remoteCPU, (o) -> { then.compute(o); return null; });
     }
 
-    public Future<Void> onFailure(VoidTask<Throwable> continuation)
+    public void onFailure(VoidTask<Throwable> continuation)
     {
-        return onFailure.onSuccess(continuation);
-    }
-
-    public <T> Future<T> onFailure(Task1<Throwable, T> continuation)
-    {
-        return onFailure.map(continuation);
+        onFailure.onSuccess(continuation);
     }
 
     private void attach(Promise<?> continuation)

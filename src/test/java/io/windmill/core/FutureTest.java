@@ -1,7 +1,6 @@
 package io.windmill.core;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -121,9 +120,7 @@ public class FutureTest extends AbstractTest
 
         futureB.flatMap((o) -> {
             o.onSuccess((n) -> Assert.fail());
-            o.onFailure((e) -> {
-                exceptionTask(failure, latchB).compute(e);
-            });
+            o.onFailure((e) -> exceptionTask(failure, latchB).compute(e));
 
             return null;
         });
@@ -188,9 +185,7 @@ public class FutureTest extends AbstractTest
         Future<Integer> failedFuture = new Future<>(cpu);
         CountDownLatch latchA = new CountDownLatch(1);
 
-        failedFuture.onFailure((e) -> {
-            exceptionTask(exception, latchA).compute(e);
-        });
+        failedFuture.onFailure((e) -> exceptionTask(exception, latchA).compute(e));
 
         setFailure(cpu, failedFuture, new IllegalArgumentException());
 
@@ -205,9 +200,7 @@ public class FutureTest extends AbstractTest
 
         // on failure set on the already failed future
         CountDownLatch latchB = new CountDownLatch(1);
-        failedFuture.onFailure((e) -> {
-            exceptionTask(exception, latchB).compute(e);
-        });
+        failedFuture.onFailure((e) -> exceptionTask(exception, latchB).compute(e));
 
         Uninterruptibles.awaitUninterruptibly(latchB);
 
@@ -217,8 +210,7 @@ public class FutureTest extends AbstractTest
 
         AtomicInteger universalNumber = new AtomicInteger(0);
         CountDownLatch latchC = new CountDownLatch(1);
-
-        failedFuture.onFailure((e) -> 42).onSuccess((n) -> mapTask(universalNumber, latchC).compute(n));
+        failedFuture.onFailure((e) -> mapTask(universalNumber, latchC).compute(42));
 
         Uninterruptibles.awaitUninterruptibly(latchC);
         Assert.assertEquals(42, universalNumber.get());
@@ -227,7 +219,7 @@ public class FutureTest extends AbstractTest
         CountDownLatch latchD = new CountDownLatch(1);
 
         Future<Integer> unresolvedFailure = new Future<>(cpu);
-        unresolvedFailure.onFailure((e) -> 42).onSuccess((n) -> mapTask(universalNumber, latchD).compute(n));
+        unresolvedFailure.onFailure((e) -> mapTask(universalNumber, latchD).compute(42));
 
         Assert.assertEquals(0, universalNumber.get());
 
@@ -310,16 +302,25 @@ public class FutureTest extends AbstractTest
 
     @Test
     public void testOnSuccessDiffCPU() throws InterruptedException {
+        AtomicInteger threadId = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(1);
         Future<Integer> future = new Future<>(CPUs.get(0));
-        Future<Void> sucFu = future.onSuccess(CPUs.get(2), (v) -> {
-            int expected = CPUs.get(2).getId();
-            int threadId = Integer.parseInt(Thread.currentThread().getName().split("-")[0]);
-            Assert.assertEquals(expected, threadId);
+        future.onSuccess(CPUs.get(2), (v) -> {
+            try
+            {
+                threadId.set(Integer.parseInt(Thread.currentThread().getName().split("-")[0]));
+            }
+            finally
+            {
+                latch.countDown();
+            }
         });
-        future.setValue(42);
-        while (!sucFu.isAvailable())
-            TimeUnit.MILLISECONDS.sleep(50);
-        Assert.assertTrue("onSuccess was not successful!", sucFu.isSuccess());
+
+        setValue(CPUs.get(0), future, 42);
+        Uninterruptibles.awaitUninterruptibly(latch);
+
+        Assert.assertTrue(future.isSuccess());
+        Assert.assertEquals(CPUs.get(2).getId(), threadId.get());
     }
 
     private static <T> void setValue(CPU cpu, Future<T> future, T value)

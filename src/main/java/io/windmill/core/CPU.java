@@ -83,7 +83,10 @@ public class CPU
 
     public <O> void loop(Task1<CPU, Future<O>> task)
     {
-        schedule(() -> task.compute(this).onSuccess((o) -> loop(task)));
+        schedule(() -> task.compute(this).map((o) -> {
+            loop(task);
+            return null;
+        }));
     }
 
     public <O> Future<O> sleep(long duration, TimeUnit unit, Task0<O> then)

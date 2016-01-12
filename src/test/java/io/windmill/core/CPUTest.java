@@ -50,13 +50,15 @@ public class CPUTest extends AbstractTest
             OutputStream output = c.getOutput();
 
             c.loop((cpu) -> input.read(4).flatMap((header) -> input.read(header.readInt()))
-                                         .onSuccess((msg) -> {
+                                         .map((msg) -> {
                                              int sum = 0;
                                              while (msg.readableBytes() > 0)
                                                  sum += msg.readInt();
 
                                              output.writeAndFlush(Unpooled.buffer(12).writeInt(sum))
                                                    .onSuccess((bytesWritten) -> Assert.assertEquals(4, bytesWritten.intValue()));
+
+                                             return null;
                                          }));
         }, Throwable::printStackTrace);
 
