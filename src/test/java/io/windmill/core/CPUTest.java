@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import io.windmill.net.io.InputStream;
 import io.windmill.net.io.OutputStream;
+import io.windmill.utils.Futures;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
@@ -30,7 +31,7 @@ public class CPUTest extends AbstractTest
             {
                 return (latch.getCount() == 0)
                         ? new Future<Integer>(cpu) {{ setFailure(null); }}
-                        : new ConstantFuture<>(cpu, 42);
+                        : Futures.constantFuture(cpu, 42);
             }
             finally
             {

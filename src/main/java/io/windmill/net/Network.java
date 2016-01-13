@@ -9,7 +9,7 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.Iterator;
 
 import io.windmill.core.CPU;
-import io.windmill.core.tasks.VoidTask;
+import io.windmill.core.tasks.VoidTask1;
 import io.windmill.utils.IOUtils;
 
 public class Network implements AutoCloseable
@@ -23,7 +23,7 @@ public class Network implements AutoCloseable
         this.selector = openSelector();
     }
 
-    public ServerSocket listen(InetSocketAddress address, VoidTask<Channel> onAccept, VoidTask<Throwable> onFailure) throws IOException
+    public ServerSocket listen(InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure) throws IOException
     {
         return new ServerSocket(cpu, selector, address, onAccept, onFailure);
     }

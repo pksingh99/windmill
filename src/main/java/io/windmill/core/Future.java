@@ -4,7 +4,8 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 
 import io.windmill.core.tasks.Task1;
-import io.windmill.core.tasks.VoidTask;
+import io.windmill.core.tasks.VoidTask0;
+import io.windmill.core.tasks.VoidTask1;
 
 public class Future<O>
 {
@@ -118,19 +119,25 @@ public class Future<O>
         return sink;
     }
 
-    public void onSuccess(VoidTask<O> then)
+    public void onSuccess(VoidTask1<O> then)
     {
         map((o) -> { then.compute(o); return null; });
     }
 
-    public void onSuccess(CPU remoteCPU, VoidTask<O> then)
+    public void onSuccess(CPU remoteCPU, VoidTask1<O> then)
     {
         map(remoteCPU, (o) -> { then.compute(o); return null; });
     }
 
-    public void onFailure(VoidTask<Throwable> continuation)
+    public void onFailure(VoidTask1<Throwable> continuation)
     {
         onFailure.onSuccess(continuation);
+    }
+
+    public void onComplete(VoidTask0 continuation)
+    {
+        onSuccess((o) -> continuation.compute());
+        onFailure((e) -> continuation.compute());
     }
 
     private void attach(Promise<?> continuation)

@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
 
 import io.windmill.core.tasks.Task0;
 import io.windmill.core.tasks.Task1;
-import io.windmill.core.tasks.VoidTask;
+import io.windmill.core.tasks.VoidTask1;
 import io.windmill.io.File;
 import io.windmill.io.IOService;
 import io.windmill.net.Channel;
@@ -71,7 +71,7 @@ public class CPU
         return layout;
     }
 
-    public void listen(InetSocketAddress address, VoidTask<Channel> onAccept, VoidTask<Throwable> onFailure) throws IOException
+    public void listen(InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure) throws IOException
     {
         network.listen(address, onAccept, onFailure);
     }

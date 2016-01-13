@@ -5,7 +5,7 @@ import java.nio.channels.SocketChannel;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-import io.windmill.core.tasks.VoidTask;
+import io.windmill.core.tasks.VoidTask1;
 import io.windmill.net.Channel;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -151,7 +151,7 @@ public class CPUSet
             return cpus.size();
         }
 
-        public void register(SocketChannel channel, VoidTask<Channel> onSuccess, VoidTask<Throwable> onFailure)
+        public void register(SocketChannel channel, VoidTask1<Channel> onSuccess, VoidTask1<Throwable> onFailure)
         {
             if (channel == null)
                 return;

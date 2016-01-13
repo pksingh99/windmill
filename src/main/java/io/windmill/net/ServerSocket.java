@@ -7,17 +7,17 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 
 import io.windmill.core.CPU;
-import io.windmill.core.tasks.VoidTask;
+import io.windmill.core.tasks.VoidTask1;
 import io.windmill.utils.IOUtils;
 
 public class ServerSocket implements AutoCloseable
 {
     private final CPU cpu;
     private final ServerSocketChannel channel;
-    private final VoidTask<Channel> onAccept;
-    private final VoidTask<Throwable> onFailure;
+    private final VoidTask1<Channel> onAccept;
+    private final VoidTask1<Throwable> onFailure;
 
-    public ServerSocket(CPU cpu, Selector selector, InetSocketAddress address, VoidTask<Channel> onAccept, VoidTask<Throwable> onFailure) throws IOException
+    public ServerSocket(CPU cpu, Selector selector, InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure) throws IOException
     {
         this.cpu = cpu;
         this.channel = ServerSocketChannel.open();

@@ -1,10 +1,12 @@
 package io.windmill.core;
 
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.windmill.core.tasks.Task1;
+import io.windmill.utils.Futures;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
@@ -321,6 +323,38 @@ public class FutureTest extends AbstractTest
 
         Assert.assertTrue(future.isSuccess());
         Assert.assertEquals(CPUs.get(2).getId(), threadId.get());
+    }
+
+    @Test
+    public void testOnComplete()
+    {
+        CPU cpuA = CPUs.get(0);
+        CPU cpuB = CPUs.get(2);
+
+        Future<Integer> a = new Future<>(cpuA);
+        Future<Integer> b = Futures.failedFuture(cpuB, new IOException());
+
+        AtomicInteger result = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(2);
+
+        a.onComplete(() -> {
+            result.getAndAdd(21);
+            latch.countDown();
+        });
+
+        // a is going to be success and b is a failure
+        setValue(cpuA, a, 1);
+
+        b.onComplete(() -> {
+            result.getAndAdd(21);
+            latch.countDown();
+        });
+
+        Uninterruptibles.awaitUninterruptibly(latch);
+        Assert.assertTrue(a.isSuccess());
+        Assert.assertTrue(b.isFailure());
+
+        Assert.assertEquals(42, result.get());
     }
 
     private static <T> void setValue(CPU cpu, Future<T> future, T value)
