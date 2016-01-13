@@ -67,21 +67,19 @@ public class Future<O>
         state = newState;
         value = newValue;
 
-        // don't run success/map continuations on failure
-        if (state == State.FAILURE)
-        {
-            continuations.clear();
-            return;
-        }
-
         while (!continuations.isEmpty())
             continuations.poll().schedule();
     }
 
     public void setFailure(Throwable e)
     {
-        setValue(State.FAILURE, null);
+        checkState(State.WAITING);
+
+        state = State.FAILURE;
         onFailure.setValue(e);
+
+        while (!continuations.isEmpty())
+            continuations.poll().scheduleFailure(e);
     }
 
     protected void checkState(State requiredState)
@@ -144,7 +142,9 @@ public class Future<O>
     {
         if (isSuccess())
             continuation.schedule();
-
-        continuations.add(continuation);
+        else if (isFailure())
+            continuation.scheduleFailure(onFailure.get());
+        else
+            continuations.add(continuation);
     }
 }

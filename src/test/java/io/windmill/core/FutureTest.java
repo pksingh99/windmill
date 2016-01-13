@@ -35,8 +35,10 @@ public class FutureTest extends AbstractTest
     @Test
     public void testFailure()
     {
+        IllegalArgumentException e = new IllegalArgumentException();
+
         Future<Integer> future = new Future<>(null);
-        future.setFailure(new IllegalArgumentException());
+        future.setFailure(e);
 
         Assert.assertTrue(future.isAvailable());
         Assert.assertFalse(future.isSuccess());
@@ -44,7 +46,7 @@ public class FutureTest extends AbstractTest
 
         Assert.assertEquals(null, future.get());
         Assert.assertNotNull(future.onFailure);
-        Assert.assertEquals(IllegalArgumentException.class, future.onFailure.get().getClass());
+        Assert.assertEquals(e, future.onFailure.get());
     }
 
     @Test
@@ -127,10 +129,11 @@ public class FutureTest extends AbstractTest
             return null;
         });
 
-        setValue(cpu, futureB, new Future<Integer>(cpu) {{ setFailure(new RuntimeException()); }});
+        RuntimeException ex = new RuntimeException();
+        setValue(cpu, futureB, new Future<Integer>(cpu) {{ setFailure(ex); }});
 
         Uninterruptibles.awaitUninterruptibly(latchB);
-        Assert.assertEquals(RuntimeException.class, failure.get().getClass());
+        Assert.assertEquals(ex, failure.get());
     }
 
     @Test
@@ -182,6 +185,7 @@ public class FutureTest extends AbstractTest
     {
         CPU cpu = CPUs.get(0);
 
+        IllegalArgumentException ex = new IllegalArgumentException();
         AtomicReference<Throwable> exception = new AtomicReference<>();
 
         Future<Integer> failedFuture = new Future<>(cpu);
@@ -189,13 +193,13 @@ public class FutureTest extends AbstractTest
 
         failedFuture.onFailure((e) -> exceptionTask(exception, latchA).compute(e));
 
-        setFailure(cpu, failedFuture, new IllegalArgumentException());
+        setFailure(cpu, failedFuture, ex);
 
         Uninterruptibles.awaitUninterruptibly(latchA);
 
         Assert.assertTrue(failedFuture.isAvailable());
         Assert.assertTrue(failedFuture.isFailure());
-        Assert.assertEquals(IllegalArgumentException.class, exception.get().getClass());
+        Assert.assertEquals(ex, exception.get());
 
         exception.set(null);
         Assert.assertNull(exception.get());
@@ -208,7 +212,7 @@ public class FutureTest extends AbstractTest
 
         Assert.assertTrue(failedFuture.isAvailable());
         Assert.assertTrue(failedFuture.isFailure());
-        Assert.assertEquals(IllegalArgumentException.class, exception.get().getClass());
+        Assert.assertEquals(ex, exception.get());
 
         AtomicInteger universalNumber = new AtomicInteger(0);
         CountDownLatch latchC = new CountDownLatch(1);
@@ -355,6 +359,56 @@ public class FutureTest extends AbstractTest
         Assert.assertTrue(b.isFailure());
 
         Assert.assertEquals(42, result.get());
+    }
+
+    @Test
+    public void testFailurePropagation()
+    {
+        CPU cpuA = CPUs.get(0);
+        CPU cpuB = CPUs.get(2);
+
+        RuntimeException exceptionA = new RuntimeException("a");
+        RuntimeException exceptionB = new RuntimeException("b");
+
+        CountDownLatch latchA = new CountDownLatch(2);
+        CountDownLatch latchB = new CountDownLatch(3);
+
+        // test failure propagation of already failed future
+        Future<Integer> a = Futures.failedFuture(cpuA, exceptionA);
+        Future<Integer> b = a.map((v) -> 0);
+        Future<Integer> c = b.map(cpuB, (v) -> 1);
+
+        b.onComplete(latchA::countDown);
+        b.onComplete(latchA::countDown);
+
+        Uninterruptibles.awaitUninterruptibly(latchA);
+
+        Assert.assertTrue(a.isFailure());
+        Assert.assertTrue(b.isFailure());
+        Assert.assertTrue(c.isFailure());
+        Assert.assertEquals(exceptionA, a.onFailure.get());
+        Assert.assertEquals(exceptionA, b.onFailure.get());
+        Assert.assertEquals(exceptionA, c.onFailure.get());
+
+        // test failure propagation of dynamically resolved future
+        Future<Integer> d = new Future<>(cpuA);
+        Future<Integer> e = d.map(cpuB, (v) -> 2);
+        Future<Integer> f = e.map(cpuA, (v) -> 3);
+
+        d.onComplete(latchB::countDown);
+        e.onComplete(latchB::countDown);
+        f.onComplete(latchB::countDown);
+
+        setFailure(cpuA, d, exceptionB);
+
+        Uninterruptibles.awaitUninterruptibly(latchB);
+
+        Assert.assertTrue(d.isFailure());
+        Assert.assertTrue(e.isFailure());
+        Assert.assertTrue(f.isFailure());
+        Assert.assertEquals(exceptionB, d.onFailure.get());
+        Assert.assertEquals(exceptionB, e.onFailure.get());
+        Assert.assertEquals(exceptionB, f.onFailure.get());
     }
 
     private static <T> void setValue(CPU cpu, Future<T> future, T value)

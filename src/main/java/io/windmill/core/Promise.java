@@ -37,6 +37,15 @@ public class Promise<O>
         }
     }
 
+    protected void scheduleFailure(Throwable e)
+    {
+        future.cpu.schedule(() -> {
+            future.checkState(Future.State.WAITING);
+            future.setFailure(e);
+            return null;
+        });
+    }
+
     public void schedule()
     {
         future.cpu.schedule(this);
