@@ -18,6 +18,8 @@ public class Futures
         AtomicReference<Throwable> exception = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
 
+        future.onSuccess(value::set);
+        future.onFailure(exception::set);
         future.onComplete(latch::countDown);
 
         Uninterruptibles.awaitUninterruptibly(latch);
