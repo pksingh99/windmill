@@ -3,6 +3,7 @@ package io.windmill.io;
 import java.io.RandomAccessFile;
 
 import io.windmill.core.Future;
+import io.windmill.net.Channel;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -34,6 +35,11 @@ public class File
 
             return Unpooled.wrappedBuffer(buffer);
         });
+    }
+
+    public Future<Void> transferTo(Channel channel, long offset, long length)
+    {
+        return channel.getOutput().transferFrom(backend.getChannel(), offset, length);
     }
 
     public Future<Void> seek(long position)

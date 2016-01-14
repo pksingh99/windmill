@@ -19,6 +19,11 @@ public abstract class TransferTask<I, O> implements AutoCloseable
 
     public abstract boolean compute(I channel);
 
+    public Future<O> getFuture()
+    {
+        return onComplete;
+    }
+
     @Override
     public void close()
     {

@@ -19,13 +19,4 @@ public class AbstractTest
     {
         CPUs.halt();
     }
-
-    public static class ConstantFuture<T> extends Future<T>
-    {
-        public ConstantFuture(CPU cpu, T value)
-        {
-            super(cpu);
-            setValue(value);
-        }
-    }
 }

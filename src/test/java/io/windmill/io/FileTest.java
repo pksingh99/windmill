@@ -1,14 +1,22 @@
 package io.windmill.io;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.windmill.core.CPUSet;
 import io.windmill.core.Future;
 import io.windmill.core.tasks.Task0;
+import io.windmill.net.io.InputStream;
+import io.windmill.utils.Futures;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
@@ -100,6 +108,58 @@ public class FileTest
 
         Assert.assertEquals(str, new String(helloWorld.array()));
         executeBlocking(file::close);
+    }
+
+    @Test
+    public void testFileTransfer() throws Throwable
+    {
+        byte[] buffer = new byte[1024];
+        ThreadLocalRandom.current().nextBytes(buffer);
+        File file = Futures.await(CPU.open(createTempFile("transferTo"), "rw"));
+
+        try
+        {
+            executeBlocking(() -> file.write(buffer));
+            executeBlocking(file::sync);
+
+            CPU.listen(new InetSocketAddress("127.0.0.1", 31338), (c) -> {
+                InputStream in = c.getInput();
+
+                c.loop((cpu) -> in.read(8)
+                                  .flatMap((header) -> {
+                                      int offset = header.readInt();
+                                      int length = header.readInt();
+                                      return file.transferTo(c, offset, length);
+                                  }));
+            }, Throwable::printStackTrace);
+
+            try (Socket client = new Socket("localhost", 31338))
+            {
+                client.setTcpNoDelay(true);
+
+                DataInputStream input = new DataInputStream(client.getInputStream());
+                DataOutputStream output = new DataOutputStream(client.getOutputStream());
+
+                for (int i = 0; i < 100; i++)
+                {
+                    int offset = ThreadLocalRandom.current().nextInt(0, buffer.length - 2);
+                    int length = ThreadLocalRandom.current().nextInt(1, buffer.length - offset);
+
+                    output.writeInt(offset);
+                    output.writeInt(length);
+
+                    byte[] copy = new byte[length];
+                    input.readFully(copy);
+
+                    Assert.assertArrayEquals(Arrays.copyOfRange(buffer, offset, offset + length), copy);
+                }
+            }
+        }
+        finally
+        {
+            if (file != null)
+                executeBlocking(file::close);
+        }
     }
 
     private byte[] getInt(int n)

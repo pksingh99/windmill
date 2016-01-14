@@ -79,8 +79,6 @@ public class CPUTest extends AbstractTest
                 Assert.assertEquals(4, in.read(response));
                 Assert.assertEquals(3 * i + 3, Unpooled.wrappedBuffer(response).readInt());
             }
-
-            client.close();
         }
     }
 

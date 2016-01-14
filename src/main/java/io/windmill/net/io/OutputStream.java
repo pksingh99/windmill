@@ -1,6 +1,7 @@
 package io.windmill.net.io;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
@@ -17,7 +18,7 @@ public class OutputStream implements AutoCloseable
     private final CPU cpu;
     private final SelectionKey key;
     private final SocketChannel channel;
-    private final Queue<TxTask> txQueue;
+    private final Queue<TransferTask<SocketChannel, ?>> txQueue;
 
     public OutputStream(CPU cpu, SelectionKey key, SocketChannel channel)
     {
@@ -29,29 +30,30 @@ public class OutputStream implements AutoCloseable
 
     public Future<Integer> writeAndFlush(ByteBuf buffer)
     {
-        Future<Integer> future = new Future<>(cpu);
+        return writeAndFlush(new TxTask(buffer, new Future<>(cpu)));
+    }
 
-        if (!writeBytes(buffer, channel, future))
-            return future; // return failed future right away
+    public Future<Void> transferFrom(FileChannel channel, long offset, long length)
+    {
+        return writeAndFlush(new FileTxTask(channel, offset, length, new Future<>(cpu)));
+    }
 
-        if (buffer.readableBytes() == 0)
-        {
-            future.setValue(buffer.readableBytes());
-            return future;
-        }
+    public <T> Future<T> writeAndFlush(TransferTask<SocketChannel, T> task)
+    {
+        if (txQueue.size() == 0 && task.compute(channel))
+            return task.getFuture();
 
-        txQueue.add(new TxTask(buffer, future));
+        txQueue.add(task);
         key.interestOps(SelectionKey.OP_WRITE);
 
-        return future;
+        return task.getFuture();
     }
 
     public void triggerTx()
     {
         while (!txQueue.isEmpty())
         {
-            TxTask task = txQueue.peek();
-
+            TransferTask<SocketChannel, ?> task = txQueue.peek();
             if (!task.compute(channel))
                 return;
 
@@ -87,6 +89,44 @@ public class OutputStream implements AutoCloseable
                 return false;
 
             onComplete.setValue(buffer.readableBytes());
+            return true;
+        }
+    }
+
+    private static class FileTxTask extends TransferTask<SocketChannel, Void>
+    {
+        private final FileChannel file;
+        private long offset, remaining;
+
+        public FileTxTask(FileChannel file, long offset, long length, Future<Void> future)
+        {
+            super(null, future);
+
+            this.file = file;
+            this.offset = offset;
+            this.remaining = length;
+        }
+
+        @Override
+        public boolean compute(SocketChannel socket)
+        {
+            try
+            {
+                long transferred = file.transferTo(offset, remaining, socket);
+
+                offset += transferred;
+                remaining -= transferred;
+
+                if (remaining > 0)
+                    return false;
+
+                onComplete.setValue(null);
+            }
+            catch (IOException e)
+            {
+                onComplete.setFailure(e);
+            }
+
             return true;
         }
     }
