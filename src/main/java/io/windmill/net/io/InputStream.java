@@ -50,9 +50,7 @@ public class InputStream implements AutoCloseable
 
     public void triggerRx() throws IOException
     {
-        if (!rxQueue.rx(channel))
-            return;
-
+        rxQueue.rx(channel);
         triggerTasks();
     }
 
@@ -121,21 +119,31 @@ public class InputStream implements AutoCloseable
             this.maxSize = maxSize;
         }
 
-        public boolean rx(SocketChannel channel) throws IOException
+        public void rx(SocketChannel channel) throws IOException
         {
             // queue is full (read up to RX buffer size)
             if (availableBytes == maxSize)
-                return false;
+                return;
 
+            // first let's try to re-use already existing top "in-progress" buffer
+            ByteBuf inProgress = rx.peek();
+            if (inProgress != null && inProgress.writableBytes() > 0)
+            {
+                int readBytes = inProgress.writeBytes(channel, inProgress.writableBytes());
+                if (readBytes <= 0) // nothing has been read
+                    return;
+
+                availableBytes += readBytes;
+                // channel didn't have enough readable bytes to fill up "in-progress" buffer
+                if (inProgress.writableBytes() > 0)
+                    return;
+            }
+
+            // so something might be left in the buffer, let's try to allocate new component
+            // and read the remainder if any
             ByteBuf component = Unpooled.buffer(512);
-            int readBytes = component.writeBytes(channel, component.writableBytes());
-            if (readBytes <= 0)
-                return false;
-
+            availableBytes += component.writeBytes(channel, component.writableBytes());
             rx.add(component);
-            availableBytes += readBytes;
-
-            return true;
         }
 
         public ByteBuf transfer(int size)
@@ -145,14 +153,11 @@ public class InputStream implements AutoCloseable
             while (!rx.isEmpty())
             {
                 ByteBuf rxBuffer = rx.peek();
-                int position = rxBuffer.readerIndex();
 
                 // perfect, we can satisfy I/O with a single buffer slice
                 if (buffer == null && rxBuffer.readableBytes() >= size)
                 {
-                    ByteBuf slice = rxBuffer.slice(position, size);
-                    // advance reader index of the original buffer
-                    rxBuffer.readerIndex(position + size);
+                    ByteBuf slice = consume(rxBuffer, size);
                     if (rxBuffer.readableBytes() == 0)
                         rx.poll(); // if completely consumed, remove from the list
 
@@ -163,13 +168,11 @@ public class InputStream implements AutoCloseable
                 if (buffer == null)
                     buffer = Unpooled.compositeBuffer();
 
-                int consumableSize = Math.min(position, size);
-                buffer.addComponent(rxBuffer.slice(position, consumableSize));
+                int consumableSize = Math.min(rxBuffer.readableBytes(), size);
+                buffer.addComponent(consume(rxBuffer, consumableSize));
 
                 // advance writer index of the composite buffer, to track read progress
                 buffer.writerIndex(buffer.writerIndex() + consumableSize);
-                // advance reader index of the original buffer
-                rxBuffer.readerIndex(position + consumableSize);
 
                 size -= consumableSize;
                 availableBytes -= consumableSize;
@@ -196,6 +199,14 @@ public class InputStream implements AutoCloseable
                 rx.poll().release();
 
             availableBytes = 0;
+        }
+
+        private ByteBuf consume(ByteBuf src, int length)
+        {
+            int position = src.readerIndex();
+            ByteBuf slice = src.slice(position, length);
+            src.readerIndex(position + length);
+            return slice;
         }
     }
 }
