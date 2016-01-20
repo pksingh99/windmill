@@ -26,12 +26,12 @@ public class CPUTest extends AbstractTest
     {
         CountDownLatch latch = new CountDownLatch(10);
 
-        CPUs.get(0).loop((cpu) -> {
+        CPUs.get(0).repeat((CPU cpu, Long prev) -> {
             try
             {
-                return (latch.getCount() == 0)
-                        ? new Future<Integer>(cpu) {{ setFailure(null); }}
-                        : Futures.constantFuture(cpu, 42);
+                return (prev == null || prev > 0)
+                        ? Futures.constantFuture(cpu, latch.getCount())
+                        : Futures.failedFuture(cpu, null);
             }
             finally
             {
@@ -50,17 +50,18 @@ public class CPUTest extends AbstractTest
             InputStream input = c.getInput();
             OutputStream output = c.getOutput();
 
-            c.loop((cpu) -> input.read(4).flatMap((header) -> input.read(header.readInt()))
-                                         .map((msg) -> {
-                                             int sum = 0;
-                                             while (msg.readableBytes() > 0)
-                                                 sum += msg.readInt();
+            c.loop((cpu, prev) -> input.read(4)
+                                       .flatMap((header) -> input.read(header.readInt()))
+                                       .map((msg) -> {
+                                           int sum = 0;
+                                           while (msg.readableBytes() > 0)
+                                               sum += msg.readInt();
 
-                                             output.writeAndFlush(Unpooled.buffer(12).writeInt(sum))
-                                                   .onSuccess((bytesWritten) -> Assert.assertEquals(4, bytesWritten.intValue()));
+                                           output.writeAndFlush(Unpooled.buffer(12).writeInt(sum))
+                                                 .onSuccess((bytesWritten) -> Assert.assertEquals(4, bytesWritten.intValue()));
 
-                                             return null;
-                                         }));
+                                           return null;
+                                       }));
         }, Throwable::printStackTrace);
 
 

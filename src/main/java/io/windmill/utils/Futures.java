@@ -30,6 +30,11 @@ public class Futures
         return value.get();
     }
 
+    public static Future<Void> voidFuture(CPU cpu)
+    {
+        return constantFuture(cpu, null);
+    }
+
     public static <T> Future<T> constantFuture(CPU cpu, T value)
     {
         return new ConstantFuture<>(cpu, value);

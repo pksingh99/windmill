@@ -1,6 +1,7 @@
 package io.windmill.net.io;
 
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -40,6 +41,9 @@ public class OutputStream implements AutoCloseable
 
     public <T> Future<T> writeAndFlush(TransferTask<SocketChannel, T> task)
     {
+        if (!channel.isOpen())
+             task.close();
+
         if (txQueue.size() == 0 && task.compute(channel))
             return task.getFuture();
 

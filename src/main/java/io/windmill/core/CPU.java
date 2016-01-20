@@ -8,7 +8,8 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 
 import io.windmill.core.tasks.Task0;
-import io.windmill.core.tasks.Task1;
+import io.windmill.core.tasks.Task2;
+import io.windmill.core.tasks.VoidTask0;
 import io.windmill.core.tasks.VoidTask1;
 import io.windmill.io.File;
 import io.windmill.io.IOService;
@@ -76,17 +77,24 @@ public class CPU
         network.listen(address, onAccept, onFailure);
     }
 
+    public Future<Void> schedule(VoidTask0 task)
+    {
+        return schedule(() -> { task.compute(); return null; });
+    }
+
     public <O> Future<O> schedule(Task0<O> task)
     {
         return schedule(new Promise<>(this, task));
     }
 
-    public <O> void loop(Task1<CPU, Future<O>> task)
+    public <O> void repeat(Task2<CPU, O, Future<O>> task)
     {
-        schedule(() -> task.compute(this).map((o) -> {
-            loop(task);
-            return null;
-        }));
+        repeat(task, null);
+    }
+
+    private <O> void repeat(Task2<CPU, O, Future<O>> task, O prev)
+    {
+        schedule(() -> task.compute(this, prev).onSuccess((v) -> repeat(task, v)));
     }
 
     public <O> Future<O> sleep(long duration, TimeUnit unit, Task0<O> then)

@@ -2,6 +2,7 @@ package io.windmill.net.io;
 
 import java.io.IOException;
 import java.net.SocketException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.Queue;
@@ -9,6 +10,7 @@ import java.util.Queue;
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
 import io.windmill.net.TransferTask;
+import io.windmill.utils.Futures;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -32,6 +34,9 @@ public class InputStream implements AutoCloseable
 
     public Future<ByteBuf> read(int size)
     {
+        if (!channel.isOpen())
+            return Futures.failedFuture(cpu, new ClosedChannelException());
+
         Future<ByteBuf> ioPromise = new Future<>(cpu);
 
         if (rxQueue.availableBytes() < size || !pendingTasks.isEmpty())

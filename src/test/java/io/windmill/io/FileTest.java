@@ -124,13 +124,7 @@ public class FileTest
 
             CPU.listen(new InetSocketAddress("127.0.0.1", 31338), (c) -> {
                 InputStream in = c.getInput();
-
-                c.loop((cpu) -> in.read(8)
-                                  .flatMap((header) -> {
-                                      int offset = header.readInt();
-                                      int length = header.readInt();
-                                      return file.transferTo(c, offset, length);
-                                  }));
+                c.loop((cpu, prev) -> in.read(8).map((header) -> file.transferTo(c, header.readInt(), header.readInt())));
             }, Throwable::printStackTrace);
 
             try (Socket client = new Socket("localhost", 31338))

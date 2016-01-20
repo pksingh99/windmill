@@ -37,22 +37,23 @@ public class App
             AtomicInteger counter = new AtomicInteger(0);
             AtomicInteger totalSize = new AtomicInteger(0);
 
-            c.loop((cpu) -> input.read(4).flatMap((header) -> input.read(header.readInt()))
-                                         .map((msg) -> {
-                                             int sum = 0;
-                                             int count = msg.readInt();
-                                             for (int i = 0; i < count; i++)
-                                                 sum += msg.readInt();
+            c.loop((cpu, prev) -> input.read(4)
+                                       .flatMap((header) -> input.read(header.readInt()))
+                                       .map((msg) -> {
+                                           int sum = 0;
+                                           int count = msg.readInt();
+                                           for (int i = 0; i < count; i++)
+                                               sum += msg.readInt();
 
-                                             long timestamp = msg.readLong();
+                                           long timestamp = msg.readLong();
 
-                                             totalSize.addAndGet(4 + 4 + count * 4 + 8);
-                                             if (counter.incrementAndGet() % 10000 == 0)
-                                                 System.out.println("received " + counter + " messages, total size " + totalSize.get() + " bytes");
+                                           totalSize.addAndGet(4 + 4 + count * 4 + 8);
+                                           if (counter.incrementAndGet() % 10000 == 0)
+                                               System.out.println("received " + counter + " messages, total size " + totalSize.get() + " bytes");
 
-                                             output.writeAndFlush(Unpooled.buffer(12).writeInt(sum).writeLong(timestamp));
-                                             return null;
-                                         }));
+                                           output.writeAndFlush(Unpooled.buffer(12).writeInt(sum).writeLong(timestamp));
+                                           return null;
+                                       }));
 
         }, Throwable::printStackTrace);
 
