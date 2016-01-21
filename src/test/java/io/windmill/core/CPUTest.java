@@ -46,7 +46,7 @@ public class CPUTest extends AbstractTest
     public void testListen() throws Exception
     {
         // non-blocking server which takes frame consisting
-        CPUs.get(0).listen(new InetSocketAddress("localhost", 31337), (c) -> {
+        CPUs.get(0).listen(new InetSocketAddress("localhost", 31337)).onSuccess((c) -> {
             InputStream input = c.getInput();
             OutputStream output = c.getOutput();
 
@@ -62,7 +62,7 @@ public class CPUTest extends AbstractTest
 
                                            return null;
                                        }));
-        }, Throwable::printStackTrace);
+        });
 
 
         try (Socket client = new Socket("localhost", 31337))

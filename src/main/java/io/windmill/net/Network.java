@@ -2,13 +2,16 @@ package io.windmill.net;
 
 import java.io.IOError;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Iterator;
 
 import io.windmill.core.CPU;
+import io.windmill.core.Future;
 import io.windmill.core.tasks.VoidTask1;
 import io.windmill.utils.IOUtils;
 
@@ -23,9 +26,14 @@ public class Network implements AutoCloseable
         this.selector = openSelector();
     }
 
-    public ServerSocket listen(InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure) throws IOException
+    public Future<Channel> listen(InetSocketAddress address)
     {
-        return new ServerSocket(cpu, selector, address, onAccept, onFailure);
+        return new ServerSocket(cpu, selector, address);
+    }
+
+    public Future<Channel> connect(InetSocketAddress address)
+    {
+        return new ClientSocket(cpu, selector, address);
     }
 
     public void poll() throws IOException
@@ -58,6 +66,10 @@ public class Network implements AutoCloseable
             else if (key.isWritable())
             {
                 ((Channel) key.attachment()).onWrite();
+            }
+            else if (key.isConnectable())
+            {
+                ((ClientSocket) key.attachment()).onConnect();
             }
         }
     }

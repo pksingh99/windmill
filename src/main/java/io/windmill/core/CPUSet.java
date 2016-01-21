@@ -1,11 +1,10 @@
 package io.windmill.core;
 
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.ServerSocketChannel;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-import io.windmill.core.tasks.VoidTask1;
 import io.windmill.net.Channel;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -151,24 +150,21 @@ public class CPUSet
             return cpus.size();
         }
 
-        public void register(SocketChannel channel, VoidTask1<Channel> onSuccess, VoidTask1<Throwable> onFailure)
+        public void register(ServerSocketChannel channel, Future<Channel> promise)
         {
             if (channel == null)
                 return;
 
             CPU cpu = getCPU();
-            cpu.schedule(() -> {
-                try
-                {
-                    onSuccess.compute(new Channel(cpu, cpu.getSelector(), channel));
-                }
-                catch (Exception | Error e)
-                {
-                    onFailure.compute(e);
-                }
 
-                return null;
-            });
+            try
+            {
+                promise.setValue(new Channel(cpu, cpu.getSelector(), channel.accept()));
+            }
+            catch (Exception | Error e)
+            {
+                promise.setFailure(e);
+            }
         }
     }
 }

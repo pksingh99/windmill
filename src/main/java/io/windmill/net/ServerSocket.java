@@ -1,42 +1,50 @@
 package io.windmill.net;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 
 import io.windmill.core.CPU;
-import io.windmill.core.tasks.VoidTask1;
+import io.windmill.core.Future;
 import io.windmill.utils.IOUtils;
 
-public class ServerSocket implements AutoCloseable
+public class ServerSocket extends Future<Channel> implements AutoCloseable
 {
-    private final CPU cpu;
     private final ServerSocketChannel channel;
-    private final VoidTask1<Channel> onAccept;
-    private final VoidTask1<Throwable> onFailure;
 
-    public ServerSocket(CPU cpu, Selector selector, InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure) throws IOException
+    public ServerSocket(CPU cpu, Selector selector, InetSocketAddress address)
     {
-        this.cpu = cpu;
-        this.channel = ServerSocketChannel.open();
-        this.onAccept = onAccept;
-        this.onFailure = onFailure;
+        super(cpu);
 
-        java.net.ServerSocket socket = channel.socket();
+        ServerSocketChannel server;
 
-        channel.configureBlocking(false);
-        socket.setReuseAddress(true);
-        socket.setSoTimeout(0);
-        socket.bind(address);
+        try
+        {
+            server = ServerSocketChannel.open();
 
-        channel.register(selector, SelectionKey.OP_ACCEPT, this);
+            java.net.ServerSocket socket = server.socket();
+
+            server.configureBlocking(false);
+
+            socket.setReuseAddress(true);
+            socket.setSoTimeout(0);
+            socket.bind(address);
+
+            server.register(selector, SelectionKey.OP_ACCEPT, this);
+        }
+        catch (Exception | Error e)
+        {
+            setFailure(e);
+            server = null;
+        }
+
+        this.channel = server;
     }
 
-    protected void onAccept() throws IOException
+    protected void onAccept()
     {
-        cpu.getSocket().register(channel.accept(), onAccept, onFailure);
+        cpu.getSocket().register(channel, this);
     }
 
     @Override

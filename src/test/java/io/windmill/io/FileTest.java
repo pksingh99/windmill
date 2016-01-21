@@ -1,21 +1,20 @@
 package io.windmill.io;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.windmill.core.CPUSet;
 import io.windmill.core.Future;
 import io.windmill.core.tasks.Task0;
+import io.windmill.net.Channel;
 import io.windmill.net.io.InputStream;
+import io.windmill.net.io.OutputStream;
 import io.windmill.utils.Futures;
 
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -113,8 +112,9 @@ public class FileTest
     @Test
     public void testFileTransfer() throws Throwable
     {
-        byte[] buffer = new byte[1024];
-        ThreadLocalRandom.current().nextBytes(buffer);
+        byte[] randomBytes = new byte[1024];
+        ThreadLocalRandom.current().nextBytes(randomBytes);
+        ByteBuf buffer = Unpooled.wrappedBuffer(randomBytes);
         File file = Futures.await(CPU.open(createTempFile("transferTo"), "rw"));
 
         try
@@ -122,32 +122,56 @@ public class FileTest
             executeBlocking(() -> file.write(buffer));
             executeBlocking(file::sync);
 
-            CPU.listen(new InetSocketAddress("127.0.0.1", 31338), (c) -> {
+            CPU.listen(new InetSocketAddress("127.0.0.1", 31338)).onSuccess((c) -> {
                 InputStream in = c.getInput();
                 c.loop((cpu, prev) -> in.read(8).map((header) -> file.transferTo(c, header.readInt(), header.readInt())));
-            }, Throwable::printStackTrace);
+            });
 
-            try (Socket client = new Socket("localhost", 31338))
-            {
-                client.setTcpNoDelay(true);
+            Future<Channel> client = CPU.connect(new InetSocketAddress("127.0.0.1", 31338));
 
-                DataInputStream input = new DataInputStream(client.getInputStream());
-                DataOutputStream output = new DataOutputStream(client.getOutputStream());
+            CountDownLatch latch = new CountDownLatch(100);
+            AtomicBoolean result = new AtomicBoolean(true);
 
-                for (int i = 0; i < 100; i++)
-                {
-                    int offset = ThreadLocalRandom.current().nextInt(0, buffer.length - 2);
-                    int length = ThreadLocalRandom.current().nextInt(1, buffer.length - offset);
+            client.onSuccess((channel) -> {
+                InputStream in = channel.getInput();
+                OutputStream out = channel.getOutput();
 
-                    output.writeInt(offset);
-                    output.writeInt(length);
+                channel.loop((cpu, prev) -> {
+                    if (latch.getCount() == 0) // done
+                        return Futures.failedFuture(cpu, null);
 
-                    byte[] copy = new byte[length];
-                    input.readFully(copy);
+                    int offset = ThreadLocalRandom.current().nextInt(0, randomBytes.length - 2);
+                    int length = ThreadLocalRandom.current().nextInt(1, randomBytes.length - offset);
 
-                    Assert.assertArrayEquals(Arrays.copyOfRange(buffer, offset, offset + length), copy);
-                }
-            }
+                    // write offset and length
+                    out.writeAndFlush(Unpooled.buffer(16).writeInt(offset).writeInt(length));
+
+                    return in.read(length).map((region) -> {
+                        try
+                        {
+                            result.set(result.get() & buffer.slice(offset, length).equals(region));
+                            return Futures.voidFuture(cpu);
+                        }
+                        finally
+                        {
+                            latch.countDown();
+                        }
+                    });
+                });
+            });
+
+            client.onFailure((e) -> {
+                e.printStackTrace();
+
+                // drain latch in case of failure
+                while (latch.getCount() != 0)
+                    latch.countDown();
+            });
+
+            Uninterruptibles.awaitUninterruptibly(latch);
+
+            // all of the regions should be valid to comply
+            Assert.assertTrue(result.get());
         }
         finally
         {

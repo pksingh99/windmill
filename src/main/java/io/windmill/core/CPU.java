@@ -1,6 +1,5 @@
 package io.windmill.core;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.Selector;
 import java.util.concurrent.DelayQueue;
@@ -10,7 +9,6 @@ import java.util.concurrent.TimeUnit;
 import io.windmill.core.tasks.Task0;
 import io.windmill.core.tasks.Task2;
 import io.windmill.core.tasks.VoidTask0;
-import io.windmill.core.tasks.VoidTask1;
 import io.windmill.io.File;
 import io.windmill.io.IOService;
 import io.windmill.net.Channel;
@@ -72,9 +70,14 @@ public class CPU
         return layout;
     }
 
-    public void listen(InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure) throws IOException
+    public Future<Channel> listen(InetSocketAddress address)
     {
-        network.listen(address, onAccept, onFailure);
+        return network.listen(address);
+    }
+
+    public Future<Channel> connect(InetSocketAddress address)
+    {
+        return network.connect(address);
     }
 
     public Future<Void> schedule(VoidTask0 task)

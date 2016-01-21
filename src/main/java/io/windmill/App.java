@@ -28,7 +28,7 @@ public class App
         cpu1.schedule(sum(new int[] { 10, 11, 12 })).map((sum) -> Integer.toString(sum)).onSuccess(System.out::println);
         cpu0.schedule(sum(new int[] { 13, 14, 15 })).flatMap((sum) -> cpu1.schedule(() -> 42)).onSuccess(System.out::println);
 
-        cpu0.listen(new InetSocketAddress("localhost", 31337), (c) -> {
+        cpu0.listen(new InetSocketAddress("localhost", 31337)).onSuccess((c) -> {
             System.out.println("connected to => " + c + " on " + Thread.currentThread());
 
             InputStream input = c.getInput();
@@ -55,7 +55,7 @@ public class App
                                            return null;
                                        }));
 
-        }, Throwable::printStackTrace);
+        });
 
         cpu0.schedule(sum(new int[] { 10, 11, 12 })).map(cpu1, (sum) -> Integer.toString(sum)).onSuccess(System.out::println);
 
