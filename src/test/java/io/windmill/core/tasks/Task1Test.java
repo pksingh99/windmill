@@ -1,11 +1,12 @@
 package io.windmill.core.tasks;
 
+import io.windmill.utils.Tasks;
+
 import org.junit.Assert;
 import org.junit.Test;
 
 public class Task1Test
 {
-
     @Test
     public void andThen()
     {

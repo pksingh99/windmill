@@ -1,4 +1,8 @@
-package io.windmill.core.tasks;
+package io.windmill.utils;
+
+import io.windmill.core.tasks.Task0;
+import io.windmill.core.tasks.Task1;
+import io.windmill.core.tasks.Task2;
 
 public final class Tasks
 {

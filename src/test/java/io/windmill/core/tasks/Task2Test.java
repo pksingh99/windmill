@@ -1,14 +1,12 @@
 package io.windmill.core.tasks;
 
+import io.windmill.utils.Tasks;
+
 import org.junit.Assert;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class Task2Test
 {
-    private static final Logger logger = LoggerFactory.getLogger(Task2Test.class);
-
     @Test
     public void curried()
     {
