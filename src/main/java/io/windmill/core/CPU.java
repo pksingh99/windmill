@@ -2,9 +2,12 @@ package io.windmill.core;
 
 import java.net.InetSocketAddress;
 import java.nio.channels.Selector;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.windmill.core.tasks.Task0;
 import io.windmill.core.tasks.Task2;
@@ -98,6 +101,41 @@ public class CPU
     private <O> void repeat(Task2<CPU, O, Future<O>> task, O prev)
     {
         schedule(() -> task.compute(this, prev).onSuccess((v) -> repeat(task, v)));
+    }
+
+    public <I> Future<List<I>> sequence(List<Future<I>> futures)
+    {
+        Future<List<I>> promise = new Future<>(this);
+        schedule(() -> {
+            AtomicInteger counter = new AtomicInteger(0);
+            List<I> results = new ArrayList<>(futures.size());
+
+            for (int i = 0; i < futures.size(); i++)
+            {
+                int currentIndex = i;
+                Future<I> f = futures.get(i);
+
+                // pre-allocate the space for the elements being added out of order
+                results.add(null);
+
+                // both success and failure handling
+                // should be done based on the correct CPU context
+                f.onSuccess((v) -> schedule(() -> {
+                    results.set(currentIndex, v);
+
+                    // collect all of the results before
+                    // marking flattened future as success
+                    if (counter.incrementAndGet() >= futures.size())
+                        promise.setValue(results);
+                }));
+
+                // if at least one of the futures fails, fail flattened promise.
+                f.onFailure((e) -> schedule(() -> promise.setFailure(e)));
+            }
+
+        });
+
+        return promise;
     }
 
     public <O> Future<O> sleep(long duration, TimeUnit unit, Task0<O> then)

@@ -2,6 +2,9 @@ package io.windmill.core;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -114,6 +117,39 @@ public class CPUTest extends AbstractTest
         // sleep a bit for to get 6th count
         Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
         Assert.assertEquals(6, counts.get());
+    }
+
+    @Test
+    public void testSequencing() throws Throwable
+    {
+        List<Future<Integer>> futures = new ArrayList<Future<Integer>>()
+        {{
+            for (int i = 0; i < 5; i++)
+            {
+                int currentIndex = i;
+                add(i % 2 == 0
+                        ? Futures.constantFuture(CPUs.get(0), currentIndex)
+                        : CPUs.get(2).schedule(() -> currentIndex));
+            }
+        }};
+
+        List<Integer> result = Futures.await(CPUs.get(0).sequence(futures));
+
+        Assert.assertEquals(5, result.size());
+        Assert.assertEquals(Arrays.asList(0, 1, 2, 3, 4), result);
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testSequencingWithFailures() throws Throwable
+    {
+        List<Future<Integer>> futures = new ArrayList<Future<Integer>>()
+        {{
+            add(Futures.constantFuture(CPUs.get(0), 0));
+            add(Futures.failedFuture(CPUs.get(2), new IllegalArgumentException()));
+            add(Futures.constantFuture(CPUs.get(2), 1));
+        }};
+
+        Futures.await(CPUs.get(0).sequence(futures));
     }
 
     private static ByteBuf getRequest(int[] numbers)

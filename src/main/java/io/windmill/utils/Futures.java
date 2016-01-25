@@ -3,9 +3,10 @@ package io.windmill.utils;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.util.concurrent.Uninterruptibles;
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
+
+import com.google.common.util.concurrent.Uninterruptibles;
 
 public class Futures
 {
