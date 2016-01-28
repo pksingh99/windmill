@@ -1,4 +1,4 @@
-package io.windmill.io;
+package io.windmill.disk;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
+
 import net.openhft.affinity.AffinitySupport;
 
 public class IOService implements AutoCloseable
@@ -24,10 +25,15 @@ public class IOService implements AutoCloseable
 
     public Future<File> open(String path, String mode)
     {
-        return schedule(() -> new File(this, new RandomAccessFile(path, mode)));
+        return schedule(() -> new File(cpu, new RandomAccessFile(path, mode)));
     }
 
-    <O> Future<O> schedule(IOTask<O> task)
+    public CPU getCPU()
+    {
+        return cpu;
+    }
+
+    public <O> Future<O> schedule(IOTask<O> task)
     {
         Future<O> future = new Future<>(cpu);
         io.execute(() -> {

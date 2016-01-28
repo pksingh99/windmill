@@ -1,8 +1,10 @@
-package io.windmill.io;
+package io.windmill.disk;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -11,7 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import io.windmill.core.CPUSet;
 import io.windmill.core.Future;
-import io.windmill.core.tasks.Task0;
+import io.windmill.disk.cache.Page;
 import io.windmill.net.Channel;
 import io.windmill.net.io.InputStream;
 import io.windmill.net.io.OutputStream;
@@ -76,40 +78,72 @@ public class FileTest
     }
 
     @Test
-    public void testingBasicRW() throws Exception
+    public void testingBasicRW() throws Throwable
     {
         String str = "hello world";
-        CountDownLatch writeLatch = new CountDownLatch(1);
-        AtomicReference<File> fileRef = new AtomicReference<>();
+        java.io.File tmp = createTempFile("akane-io");
+        File file = Futures.await(CPU.open(tmp, "rw"));
+        ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        CPU.open(createTempFile("akane-io"), "rw")
-                .onSuccess((f) -> {
-                    fileRef.set(f);
-                    f.write(getInt(str.length()))
-                            .onSuccess((v) -> f.write(str.getBytes())
-                                    .onSuccess((w) -> writeLatch.countDown()));
-                });
+        try
+        {
+            Assert.assertEquals(0L, (long) Futures.await(file.write(0, getInt(str.length()))));
+            Assert.assertEquals(4L, (long) Futures.await(file.write(4, str.getBytes())));
 
-        Uninterruptibles.awaitUninterruptibly(writeLatch, 1, TimeUnit.SECONDS);
+            // flushed a single page
+            Assert.assertEquals(1, (int) Futures.await(file.sync()));
 
-        Assert.assertNotNull(fileRef.get());
+            // let's try positional reads first
+            Assert.assertEquals(str.length(), Futures.await(file.read(0, 4)).readInt());
+            Assert.assertArrayEquals(str.getBytes(), Futures.await(file.read(4, str.length())).array());
 
-        File file = fileRef.get();
+            // let's try to read from non-existent page
+            Assert.assertEquals(Unpooled.EMPTY_BUFFER, Futures.await(file.read(31337, 2 * Page.PAGE_SIZE)));
 
-        executeBlocking(file::sync);
-        executeBlocking(() -> file.seek(0)); // seek back to the beginning of the file
+            // seek back to the start and read the message back
+            ByteBuf helloWorld = Futures.await(file.seek(0).flatMap((context) -> context.read(4).flatMap((header) -> {
+                int len = header.readInt();
+                Assert.assertEquals(str.length(), len);
+                return context.read(len);
+            })));
 
-        ByteBuf helloWorld = executeBlocking(() -> file.read(4).flatMap((header) -> {
-            int len = header.readInt();
-            Assert.assertEquals(str.length(), len);
-            return file.read(len);
-        }));
+            Assert.assertEquals(str, new String(helloWorld.array()));
 
-        Assert.assertEquals(str, new String(helloWorld.array()));
-        executeBlocking(file::close);
+            // allocate multi-page buffer and try to write (re-writing previous data)
+            byte[] buffer = new byte[3 * Page.PAGE_SIZE];
+            random.nextBytes(buffer);
+
+            Assert.assertEquals(0L, (long) Futures.await(file.seek(0).flatMap((context) -> context.write(buffer))));
+            Assert.assertEquals(4,  (int) Futures.await(file.sync()));
+            Assert.assertEquals(buffer.length, tmp.length());
+
+            List<byte[]> pages = new ArrayList<>();
+            for (int i = 0; i < 3 * Page.PAGE_SIZE; i += Page.PAGE_SIZE * 2)
+            {
+                byte[] bytes = new byte[random.nextInt(1, Page.PAGE_SIZE)];
+                random.nextBytes(bytes);
+
+                Assert.assertEquals(i, (long) Futures.await(file.seek(i).flatMap((context) -> context.write(bytes))));
+                pages.add(bytes);
+            }
+
+            Assert.assertEquals(2, (int) Futures.await(file.sync()));
+
+            int pageOffset = 0;
+            for (byte[] bytes : pages)
+            {
+                ByteBuf read = Futures.await(file.seek(pageOffset).flatMap((f) -> f.read(Page.PAGE_SIZE)));
+                Assert.assertEquals(Unpooled.wrappedBuffer(bytes), read);
+                pageOffset += Page.PAGE_SIZE * 2;
+            }
+        }
+        finally
+        {
+            Futures.await(file.close());
+        }
     }
 
-    @Test
+    @Test @Ignore
     public void testFileTransfer() throws Throwable
     {
         byte[] randomBytes = new byte[1024];
@@ -119,8 +153,8 @@ public class FileTest
 
         try
         {
-            executeBlocking(() -> file.write(buffer));
-            executeBlocking(file::sync);
+            Futures.await(file.write(0, buffer));
+            Futures.await(file.sync());
 
             CPU.listen(new InetSocketAddress("127.0.0.1", 31338)).onSuccess((c) -> {
                 InputStream in = c.getInput();
@@ -175,28 +209,13 @@ public class FileTest
         }
         finally
         {
-            if (file != null)
-                executeBlocking(file::close);
+            Futures.await(file.close());
         }
     }
 
     private byte[] getInt(int n)
     {
         return Unpooled.copyInt(n).array();
-    }
-
-    private <O> O executeBlocking(Task0<Future<O>> task)
-    {
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<O> ref = new AtomicReference<>();
-
-        task.compute().onSuccess((v) -> {
-            latch.countDown();
-            ref.set(v);
-        });
-
-        Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.SECONDS);
-        return ref.get();
     }
 
     private java.io.File createTempFile(String prefix) throws IOException

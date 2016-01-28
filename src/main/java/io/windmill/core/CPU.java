@@ -12,8 +12,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import io.windmill.core.tasks.Task0;
 import io.windmill.core.tasks.Task2;
 import io.windmill.core.tasks.VoidTask0;
-import io.windmill.io.File;
-import io.windmill.io.IOService;
+import io.windmill.disk.File;
+import io.windmill.disk.IOService;
+import io.windmill.disk.IOTask;
 import io.windmill.net.Channel;
 import io.windmill.net.Network;
 import io.windmill.utils.IOUtils;
@@ -91,6 +92,11 @@ public class CPU
     public <O> Future<O> schedule(Task0<O> task)
     {
         return schedule(new Promise<>(this, task));
+    }
+
+    public <O> Future<O> scheduleIO(IOTask<O> task)
+    {
+        return io.schedule(task);
     }
 
     public <O> void repeat(Task2<CPU, O, Future<O>> task)
