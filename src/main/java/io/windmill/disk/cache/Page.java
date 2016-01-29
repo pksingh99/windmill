@@ -8,17 +8,25 @@ import io.netty.buffer.Unpooled;
 
 public class Page
 {
-    public static final short PAGE_SIZE = 1 << 12; // 4K page
+    public static final   int PAGE_BITS = 12;
+    public static final short PAGE_SIZE = 1 << PAGE_BITS; // 4K page
 
     private final FileCache tree;
     private final int pageOffset;
     private final ByteBuf buffer;
+
+    private boolean isDirty;
 
     public Page(FileCache tree, int pageOffset, ByteBuf buffer)
     {
         this.tree = tree;
         this.pageOffset = pageOffset;
         this.buffer = buffer;
+    }
+
+    public boolean isDirty()
+    {
+        return isDirty;
     }
 
     public int write(short position, ByteBuf data)
@@ -33,6 +41,7 @@ public class Page
         finally
         {
             tree.markPageDirty(pageOffset);
+            isDirty = true;
         }
     }
 
@@ -47,5 +56,6 @@ public class Page
     {
         buffer.getBytes(0, file.position(pageOffset * PAGE_SIZE), buffer.readableBytes());
         tree.markPageClean(pageOffset);
+        isDirty = false;
     }
 }

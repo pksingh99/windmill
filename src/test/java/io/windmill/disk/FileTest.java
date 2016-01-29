@@ -87,8 +87,8 @@ public class FileTest
 
         try
         {
-            Assert.assertEquals(0L, (long) Futures.await(file.write(0, getInt(str.length()))));
-            Assert.assertEquals(4L, (long) Futures.await(file.write(4, str.getBytes())));
+            Assert.assertEquals(4L, Futures.await(file.write(0, getInt(str.length()))).getPosition());
+            Assert.assertEquals(4L + str.length(), Futures.await(file.write(4, str.getBytes())).getPosition());
 
             // flushed a single page
             Assert.assertEquals(1, (int) Futures.await(file.sync()));
@@ -113,7 +113,7 @@ public class FileTest
             byte[] buffer = new byte[3 * Page.PAGE_SIZE];
             random.nextBytes(buffer);
 
-            Assert.assertEquals(0L, (long) Futures.await(file.seek(0).flatMap((context) -> context.write(buffer))));
+            Assert.assertEquals(buffer.length, Futures.await(file.seek(0).flatMap((context) -> context.write(buffer))).getPosition());
             Assert.assertEquals(4,  (int) Futures.await(file.sync()));
             Assert.assertEquals(buffer.length, tmp.length());
 
@@ -123,7 +123,7 @@ public class FileTest
                 byte[] bytes = new byte[random.nextInt(1, Page.PAGE_SIZE)];
                 random.nextBytes(bytes);
 
-                Assert.assertEquals(i, (long) Futures.await(file.seek(i).flatMap((context) -> context.write(bytes))));
+                Futures.await(file.seek(i).flatMap((context) -> context.write(bytes)));
                 pages.add(bytes);
             }
 
@@ -143,18 +143,21 @@ public class FileTest
         }
     }
 
-    @Test @Ignore
+    @Test
     public void testFileTransfer() throws Throwable
     {
-        byte[] randomBytes = new byte[1024];
+        byte[] randomBytes = new byte[Page.PAGE_SIZE * 5];
         ThreadLocalRandom.current().nextBytes(randomBytes);
         ByteBuf buffer = Unpooled.wrappedBuffer(randomBytes);
         File file = Futures.await(CPU.open(createTempFile("transferTo"), "rw"));
 
         try
         {
-            Futures.await(file.write(0, buffer));
-            Futures.await(file.sync());
+            Assert.assertEquals(buffer.readableBytes(), Futures.await(file.write(0, buffer)).getPosition());
+            Assert.assertEquals(6,  (int) Futures.await(file.sync()));
+
+            // evict random page to test situation when there are holes in the cache
+            Futures.await(file.cache.evictPage(ThreadLocalRandom.current().nextInt(1, 4)));
 
             CPU.listen(new InetSocketAddress("127.0.0.1", 31338)).onSuccess((c) -> {
                 InputStream in = c.getInput();
@@ -183,7 +186,10 @@ public class FileTest
                     return in.read(length).map((region) -> {
                         try
                         {
-                            result.set(result.get() & buffer.slice(offset, length).equals(region));
+                            boolean isMatch = buffer.slice(offset, length).equals(region);
+                            if (!isMatch)
+                                System.out.println("!!! failure at offset " + offset + ", length = " + length);
+                            result.set(result.get() & isMatch);
                             return Futures.voidFuture(cpu);
                         }
                         finally

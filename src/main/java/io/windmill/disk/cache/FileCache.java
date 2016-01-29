@@ -9,10 +9,13 @@ import java.util.function.Consumer;
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
 import io.windmill.net.Channel;
+import io.windmill.net.io.OutputStream;
 import io.windmill.utils.Futures;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.util.collection.IntObjectHashMap;
+import io.netty.util.collection.IntObjectMap;
 
 import com.google.common.base.Preconditions;
 
@@ -38,6 +41,7 @@ public class FileCache
 
     private final CPU cpu;
     private final FileChannel file;
+    private final IntObjectMap<Future<Page>> loadingPages = new IntObjectHashMap<>();
 
     public FileCache(CPU cpu, FileChannel backingFile)
     {
@@ -45,9 +49,28 @@ public class FileCache
         this.file = backingFile;
     }
 
-    public Future<Integer> transferTo(Channel channel, long position, long length)
+    /**
+     * Evict the page at the given offset with write-back if
+     * such page turns out to be dirty.
+     *
+     * @param pageOffset The offset of the page to evict from cache.
+     *
+     * @return promise to evict a page, which gets set when page is completely evicted.
+     */
+    public Future<Void> evictPage(int pageOffset)
     {
-        return Futures.constantFuture(cpu, 0);
+        Node slot = search(pageOffset);
+        if (slot == null || !slot.isDataNode())
+            return Futures.voidFuture(cpu);
+
+        Page page = slot.page;
+
+        // remove page reference from the slot
+        slot.setPage(null);
+
+        return !page.isDirty()
+                ? Futures.voidFuture(cpu)
+                : cpu.scheduleIO(() -> { page.writeTo(file); return null; });
     }
 
     /**
@@ -59,19 +82,32 @@ public class FileCache
      */
     public Future<Page> getOrCreate(int pageOffset)
     {
+        Node slot = search(pageOffset);
+        return slot != null && slot.isDataNode()
+                ? Futures.constantFuture(cpu, slot.page)
+                : allocatePage(pageOffset);
+    }
+
+    /**
+     * Search for an appropriate data slot based on the given page offset.
+     *
+     * @param pageOffset The offset of the page.
+     *
+     * @return page slot if it's already present in the tree, null otherwise.
+     */
+    private Node search(int pageOffset)
+    {
         Preconditions.checkArgument(pageOffset >= 0);
 
         Node node = root;
 
         if (node == null || pageOffset > HEIGHT_TO_MAX_INDEX[root.height])
-            return allocatePage(pageOffset);
+            return null;
 
         if (node.isDataNode())
         {
             // root can only have data if it's the only page in the tree (hence it's offset is 0)
-            return (pageOffset > 0)
-                    ? allocatePage(pageOffset)
-                    : Futures.constantFuture(cpu, node.page);
+            return pageOffset > 0 ? null : node;
         }
 
         int height = root.height;
@@ -84,7 +120,7 @@ public class FileCache
             int slotIndex = (pageOffset >> shift) & CACHE_NODE_SLOT_MASK;
             slot = node.slots[slotIndex];
             if (slot == null)
-                return allocatePage(pageOffset);
+                return null;
 
             node = slot; // move down the tree
             shift -= CACHE_NODE_SHIFT;
@@ -92,9 +128,7 @@ public class FileCache
         }
         while (height > 0);
 
-        return !slot.isDataNode()
-                ? allocatePage(pageOffset)
-                : Futures.constantFuture(cpu, slot.page);
+        return slot;
     }
 
     /**
@@ -171,6 +205,16 @@ public class FileCache
             offset = pageOffset & CACHE_NODE_SLOT_MASK;
             node = node.parent;
         }
+    }
+
+    public Future<Long> transferPage(Channel channel, int pageOffset, short offset, int size)
+    {
+        Node slot = search(pageOffset);
+        OutputStream out = channel.getOutput();
+
+        return slot == null || !slot.isDataNode()
+                ? out.transferFrom(file, (pageOffset << Page.PAGE_BITS) + offset, size)
+                : out.writeAndFlush(slot.page.read(offset, size));
     }
 
     /**
@@ -288,8 +332,8 @@ public class FileCache
             height--;
         }
 
-        if (slot != null)
-            throw new IllegalStateException(String.format("slot already exists for position %d", pageOffset));
+        if (slot != null && slot.isDataNode())
+            throw new IllegalStateException(String.format("page slot already exists for position %d", pageOffset));
 
         Node insertionPoint = new Node(node);
 
@@ -303,18 +347,27 @@ public class FileCache
             root = insertionPoint;
         }
 
-        return cpu.scheduleIO(() -> {
+        Future<Page> pageFuture = loadingPages.get(pageOffset);
+
+        // requested page is already page-fault'ed and being loaded from disk
+        if (pageFuture != null)
+            return pageFuture;
+
+        pageFuture = cpu.scheduleIO(() -> {
             ByteBuf buffer = Unpooled.buffer(Page.PAGE_SIZE);
-            long position = pageOffset * Page.PAGE_SIZE;
+            long position = pageOffset << Page.PAGE_BITS;
 
             // only try to read if we are in the current file limits
             if (position < file.size())
                 buffer.writeBytes(file.position(position), Page.PAGE_SIZE);
 
-            Page page = new Page(this, pageOffset, buffer);
-            insertionPoint.setPage(page);
-            return page;
+            return new Page(this, pageOffset, buffer);
         });
+
+        pageFuture.onSuccess(insertionPoint::setPage);
+        pageFuture.onComplete(() -> loadingPages.remove(pageOffset));
+
+        return pageFuture;
     }
 
     /**

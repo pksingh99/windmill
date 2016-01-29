@@ -1,31 +1,45 @@
 package io.windmill.disk;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import io.windmill.core.CPU;
 import io.windmill.core.Future;
+import io.windmill.disk.cache.FileCache;
 import io.windmill.disk.cache.Page;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.windmill.net.Channel;
 
 public class FileContext
 {
-    private final File file;
+    private final CPU cpu;
+    private final FileCache cache;
+
     private long position;
 
-    public FileContext(File file, long position)
+    public FileContext(CPU cpu, FileCache cache, long position)
     {
-        this.file = file;
+        this.cpu = cpu;
+        this.cache = cache;
         this.position = position;
     }
 
-    public Future<Long> write(byte[] buffer)
+    public long getPosition()
+    {
+        return position;
+    }
+
+    public Future<FileContext> write(byte[] buffer)
     {
         return write(Unpooled.wrappedBuffer(buffer));
     }
 
-    public Future<Long> write(ByteBuf buffer)
+    public Future<FileContext> write(ByteBuf buffer)
     {
-        long startPosition = position;
-        return file.requestPages(position, buffer.readableBytes()).map((pages) -> {
+        return requestPages(position, buffer.readableBytes()).map((pages) -> {
             short pagePosition = getPagePosition(position);
 
             for (Page page : pages)
@@ -34,13 +48,13 @@ public class FileContext
                 pagePosition = 0;
             }
 
-            return startPosition;
+            return this;
         });
     }
 
     public Future<ByteBuf> read(int size)
     {
-        return file.requestPages(position, size).map((pages) -> {
+        return requestPages(position, size).map((pages) -> {
             ByteBuf buffer = Unpooled.buffer(size);
 
             int readSize = size;
@@ -59,8 +73,55 @@ public class FileContext
         });
     }
 
+    public Future<Long> transferTo(Channel channel, long size)
+    {
+        int pageOffset = alignToPage(position) >> Page.PAGE_BITS;
+        short offset = getPagePosition(position);
+
+        List<Future<Long>> transfers = new ArrayList<>();
+        while (size > 0)
+        {
+            int toTransfer = (int) Math.min(Page.PAGE_SIZE - offset, size);
+            transfers.add(cache.transferPage(channel, pageOffset, offset, toTransfer));
+
+            pageOffset++;
+            offset = 0; // only first page has aligned offset
+            size -= toTransfer;
+        }
+
+        return cpu.sequence(transfers).map((sizes) -> {
+            long total = 0;
+            for (Long transferSize : sizes)
+                total += transferSize;
+
+            return total;
+        });
+    }
+
+    private Future<List<Page>> requestPages(long position, int size)
+    {
+        int pageCount  = size / Page.PAGE_SIZE + 1;
+        int pageOffset = alignToPage(position) >> Page.PAGE_BITS;
+
+        // optimization for single page reads
+        if (pageCount == 1)
+            return cache.getOrCreate(pageOffset).map(Collections::singletonList);
+
+        List<Future<Page>> pages = new ArrayList<>(pageCount);
+
+        for (int i = 0; i < pageCount; i++)
+            pages.add(cache.getOrCreate(pageOffset + i));
+
+        return cpu.sequence(pages);
+    }
+
     private static short getPagePosition(long position)
     {
-        return (short) (position - File.alignToPage(position));
+        return (short) (position - alignToPage(position));
+    }
+
+    private static int alignToPage(long position)
+    {
+        return (int) (position & ~(Page.PAGE_SIZE - 1));
     }
 }

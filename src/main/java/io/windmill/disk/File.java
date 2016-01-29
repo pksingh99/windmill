@@ -1,13 +1,9 @@
 package io.windmill.disk;
 
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
-import io.windmill.disk.cache.Page;
 import io.windmill.disk.cache.FileCache;
 import io.windmill.net.Channel;
 
@@ -17,8 +13,8 @@ import io.windmill.utils.Futures;
 
 public class File
 {
-    private final CPU cpu;
-    private final FileCache cache;
+    protected final CPU cpu;
+    protected final FileCache cache;
 
     File(CPU cpu, RandomAccessFile file)
     {
@@ -40,12 +36,12 @@ public class File
      *
      * @return The file offset where buffer is going to be located in the file.
      */
-    public Future<Long> write(long position, byte[] buffer)
+    public Future<FileContext> write(long position, byte[] buffer)
     {
         return write(position, Unpooled.wrappedBuffer(buffer));
     }
 
-    public Future<Long> write(long position, ByteBuf buffer)
+    public Future<FileContext> write(long position, ByteBuf buffer)
     {
         return seek(position).flatMap((context) -> context.write(buffer));
     }
@@ -55,9 +51,9 @@ public class File
         return seek(position).flatMap((context) -> context.read(size));
     }
 
-    public Future<Integer> transferTo(Channel channel, long position, long length)
+    public Future<Long> transferTo(Channel channel, long position, long length)
     {
-        return cache.transferTo(channel, position, length);
+        return seek(position).flatMap((context) -> context.transferTo(channel, length));
     }
 
     /**
@@ -72,7 +68,7 @@ public class File
      */
     public Future<FileContext> seek(long newPosition)
     {
-        return Futures.constantFuture(cpu, new FileContext(this, newPosition));
+        return Futures.constantFuture(cpu, new FileContext(cpu, cache, newPosition));
     }
 
     public Future<Integer> sync()
@@ -83,27 +79,5 @@ public class File
     public Future<Void> close()
     {
         return cache.close();
-    }
-
-    Future<List<Page>> requestPages(long position, int size)
-    {
-        int pageCount  = size / Page.PAGE_SIZE + 1;
-        int pageOffset = alignToPage(position);
-
-        // optimization for single page reads
-        if (pageCount == 1)
-            return cache.getOrCreate(pageOffset).map(Collections::singletonList);
-
-        List<Future<Page>> pages = new ArrayList<>(pageCount);
-
-        for (int i = 0; i < pageCount; i++)
-            pages.add(cache.getOrCreate(pageOffset + i));
-
-        return cpu.sequence(pages);
-    }
-
-    protected static int alignToPage(long position)
-    {
-        return (int) (position & ~(Page.PAGE_SIZE - 1));
     }
 }
