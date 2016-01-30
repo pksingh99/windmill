@@ -20,14 +20,11 @@ public class PageTest extends AbstractTest
     @Test
     public void testRW() throws IOException
     {
-        File tmp = File.createTempFile("page-rw", ".db");
-        tmp.deleteOnExit();
-
-        RandomAccessFile file = new RandomAccessFile(tmp, "rw");
+        RandomAccessFile file = createTempFile("page-rw", "rw");
 
         try
         {
-            FileCache cache = new FileCache(CPUs.get(0), file.getChannel());
+            PageCache cache = new PageCache(CPUs.get(0), file.getChannel());
             Page page = new Page(cache, 0, Unpooled.buffer(Page.PAGE_SIZE));
 
             byte[] bytes = new byte[128];
@@ -59,15 +56,10 @@ public class PageTest extends AbstractTest
 
         try
         {
-
-            File tmp = File.createTempFile("page", ".tmp");
-            tmp.deleteOnExit();
-
-            file = new RandomAccessFile(tmp, "rw");
-
+            file = createTempFile("page", "rw");
             file.write(bytes);
 
-            FileCache cache = new FileCache(CPUs.get(0), file.getChannel());
+            PageCache cache = new PageCache(CPUs.get(0), file.getChannel());
 
             Page page = Futures.await(cache.getOrCreate(0));
 
@@ -79,9 +71,9 @@ public class PageTest extends AbstractTest
             random.nextBytes(suffix);
 
             page.write((short) bytes.length, Unpooled.wrappedBuffer(suffix));
-            page.writeTo(file.getChannel());
+            page.writeTo(file.getChannel(), true);
 
-            cache = new FileCache(CPUs.get(0), file.getChannel());
+            cache = new PageCache(CPUs.get(0), file.getChannel());
             Page extendedPage = Futures.await(cache.getOrCreate(0));
 
             int totalSize = bytes.length + suffix.length;
@@ -104,5 +96,95 @@ public class PageTest extends AbstractTest
         {
             IOUtils.closeQuietly(file);
         }
+    }
+
+    @Test
+    public void testBlockMarking() throws Throwable
+    {
+        RandomAccessFile file = createTempFile("page-marking", "rw");
+
+        byte[] bytes = new byte[256];
+        ThreadLocalRandom.current().nextBytes(bytes);
+
+        file.write(bytes);
+
+        PageCache cache = new PageCache(CPUs.get(0), file.getChannel());
+
+        try
+        {
+            Page page = Futures.await(cache.getOrCreate(0));
+
+            byte[] suffix = new byte[389];
+            ThreadLocalRandom.current().nextBytes(suffix);
+
+            byte[] independent = new byte[768];
+            ThreadLocalRandom.current().nextBytes(independent);
+
+            page.write((short) bytes.length, Unpooled.wrappedBuffer(suffix));
+            page.write((short) 1024, Unpooled.wrappedBuffer(independent));
+            Assert.assertTrue(page.isDirty());
+
+            page.writeTo(file.getChannel(), true);
+            Assert.assertFalse(page.isDirty());
+
+            cache = new PageCache(CPUs.get(0), file.getChannel());
+            Page extendedPage = Futures.await(cache.getOrCreate(0));
+
+            Assert.assertEquals(page.read((short) 0, 645), extendedPage.read((short) 0, 645));
+            Assert.assertEquals(page.read((short) 1024, independent.length), extendedPage.read((short) 1024, independent.length));
+            Assert.assertEquals(page.read((short) 0, Page.PAGE_SIZE), extendedPage.read((short) 0, Page.PAGE_SIZE));
+            Assert.assertEquals(1792, page.read((short) 0, Page.PAGE_SIZE).readableBytes());
+        }
+        finally
+        {
+            Futures.await(cache.close());
+        }
+    }
+
+    @Test
+    public void testIntersectingPageReads() throws Throwable
+    {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        PageCache cache = new PageCache(CPUs.get(0), createTempFile("page-reads", "rw").getChannel());
+
+        try
+        {
+            Page page = Futures.await(cache.getOrCreate(0));
+
+            byte[] a = new byte[15];
+            random.nextBytes(a);
+
+            byte[] b = new byte[10];
+            random.nextBytes(b);
+
+            page.write((short) 0, Unpooled.wrappedBuffer(a));
+            page.write((short) 0, Unpooled.wrappedBuffer(b));
+
+            Assert.assertEquals(Unpooled.wrappedBuffer(b), page.read((short) 0, b.length));
+            Assert.assertEquals(15, page.read((short) 0, a.length).readableBytes());
+
+            byte[] c = new byte[12];
+            random.nextBytes(c);
+
+            page.write((short) 10, Unpooled.wrappedBuffer(c));
+
+            int expected = 10 + c.length;
+
+            Assert.assertEquals(expected, page.read((short) 0, expected).readableBytes());
+            Assert.assertEquals(Unpooled.wrappedBuffer(b), page.read((short)  0, b.length));
+            Assert.assertEquals(Unpooled.wrappedBuffer(c), page.read((short) 10, c.length));
+        }
+        finally
+        {
+            Futures.await(cache.close());
+        }
+    }
+
+    private static RandomAccessFile createTempFile(String prefix, String mode) throws IOException
+    {
+        File tmp = File.createTempFile(prefix, ".tmp");
+        tmp.deleteOnExit();
+
+        return new RandomAccessFile(tmp, mode);
     }
 }

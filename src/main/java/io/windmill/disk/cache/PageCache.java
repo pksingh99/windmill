@@ -70,7 +70,7 @@ public class PageCache
 
         return !page.isDirty()
                 ? Futures.voidFuture(cpu)
-                : cpu.scheduleIO(() -> { page.writeTo(file); return null; });
+                : cpu.scheduleIO(() -> { page.writeTo(file, true); return null; });
     }
 
     /**
@@ -227,9 +227,12 @@ public class PageCache
             int numFlushed = 0;
             for (Page page : getDirtyPages())
             {
-                page.writeTo(file);
+                page.writeTo(file, false);
                 numFlushed++;
             }
+
+            // after all of the pages are written, let's force fsync
+            file.force(true);
 
             return numFlushed;
         });

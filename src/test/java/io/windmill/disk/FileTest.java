@@ -132,7 +132,7 @@ public class FileTest
             int pageOffset = 0;
             for (byte[] bytes : pages)
             {
-                ByteBuf read = Futures.await(file.seek(pageOffset).flatMap((f) -> f.read(Page.PAGE_SIZE)));
+                ByteBuf read = Futures.await(file.seek(pageOffset).flatMap((context) -> context.read(bytes.length)));
                 Assert.assertEquals(Unpooled.wrappedBuffer(bytes), read);
                 pageOffset += Page.PAGE_SIZE * 2;
             }

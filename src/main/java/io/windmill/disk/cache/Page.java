@@ -8,16 +8,22 @@ import io.netty.buffer.Unpooled;
 
 public class Page
 {
-    public static final   int PAGE_BITS = 12;
-    public static final short PAGE_SIZE = 1 << PAGE_BITS; // 4K page
+    public static final   int PAGE_BITS  = 12;
+    public static final short PAGE_SIZE  = 1 << PAGE_BITS; // 4K page
+    public static final   int BLOCK_BITS = 9; // 1 << 9 = 512
+    public static final short BLOCK_SIZE = 1 << 9; // the size of the single transfer block
 
-    private final FileCache tree;
+    private final PageCache tree;
     private final int pageOffset;
     private final ByteBuf buffer;
 
-    private boolean isDirty;
+    // 4K page consists of eight (8) 512 byte blocks,
+    // which are the unit of block device transfer,
+    // so instead of trying to write whole page back
+    // to media, we to try to write only dirty slices
+    private byte dirtyBlocks;
 
-    public Page(FileCache tree, int pageOffset, ByteBuf buffer)
+    public Page(PageCache tree, int pageOffset, ByteBuf buffer)
     {
         this.tree = tree;
         this.pageOffset = pageOffset;
@@ -26,7 +32,7 @@ public class Page
 
     public boolean isDirty()
     {
-        return isDirty;
+        return dirtyBlocks != 0;
     }
 
     public int write(short position, ByteBuf data)
@@ -35,13 +41,14 @@ public class Page
 
         try
         {
-            buffer.writerIndex(position).writeBytes(data, toWrite);
+            buffer.setBytes(position, data, toWrite);
+            buffer.writerIndex(Math.max(buffer.writerIndex(), position + toWrite));
+            markDirty(position, toWrite); // mark all affected blocks as dirty
             return toWrite;
         }
         finally
         {
             tree.markPageDirty(pageOffset);
-            isDirty = true;
         }
     }
 
@@ -52,10 +59,53 @@ public class Page
                 : buffer.copy(position, Math.min(buffer.writerIndex() - position, size));
     }
 
-    public void writeTo(FileChannel file) throws IOException
+    public void writeTo(FileChannel file, boolean shouldSync) throws IOException
     {
-        buffer.getBytes(0, file.position(pageOffset * PAGE_SIZE), buffer.readableBytes());
-        tree.markPageClean(pageOffset);
-        isDirty = false;
+        try
+        {
+            long offset = pageOffset << PAGE_BITS;
+            for (int block = 0; block < Byte.SIZE; block++)
+            {
+                if ((dirtyBlocks & (1L << block)) == 0)
+                    continue; // clean block
+
+                int position = block * BLOCK_SIZE;
+                int length = Math.min(buffer.readableBytes() - position, BLOCK_SIZE);
+
+                buffer.getBytes(position, file.position(offset + position), length);
+            }
+
+            if (shouldSync)
+                file.force(true);
+        }
+        finally
+        {
+            tree.markPageClean(pageOffset);
+            dirtyBlocks = 0;
+        }
+    }
+
+    private void markDirty(short position, int size)
+    {
+        int block = position >> BLOCK_BITS;
+        int numBlocks = ((blockOffset(position) + size) >> BLOCK_BITS) + 1;
+
+        for (int i = 0; i < numBlocks; i++)
+            setBlockDirty((byte) (block + i));
+    }
+
+    private void setBlockDirty(byte blockIndex)
+    {
+        dirtyBlocks |= (1L << blockIndex);
+    }
+
+    private short blockOffset(short position)
+    {
+        return (short) (position - alignToBlock(position));
+    }
+
+    private short alignToBlock(short position)
+    {
+        return  (short) (position & ~(BLOCK_SIZE - 1));
     }
 }
