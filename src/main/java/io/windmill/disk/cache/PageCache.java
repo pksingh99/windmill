@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
  * This cache implementation is based on Linux Kernel implementation of Radix Tree (https://lwn.net/Articles/175432/)
  * Having 6 levels of nodes with 64 slots each and 4K pages allows for 17TB files.
  */
-public class FileCache
+public class PageCache
 {
     private final static int CACHE_NODE_SHIFT = 6; // 6 bits per node
     private final static int CACHE_NODE_NUM_SLOTS = 1 << CACHE_NODE_SHIFT;
@@ -43,7 +43,7 @@ public class FileCache
     private final FileChannel file;
     private final IntObjectMap<Future<Page>> loadingPages = new IntObjectHashMap<>();
 
-    public FileCache(CPU cpu, FileChannel backingFile)
+    public PageCache(CPU cpu, FileChannel backingFile)
     {
         this.cpu = cpu;
         this.file = backingFile;

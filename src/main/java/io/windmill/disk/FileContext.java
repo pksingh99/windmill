@@ -6,7 +6,7 @@ import java.util.List;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
-import io.windmill.disk.cache.FileCache;
+import io.windmill.disk.cache.PageCache;
 import io.windmill.disk.cache.Page;
 
 import io.netty.buffer.ByteBuf;
@@ -16,11 +16,11 @@ import io.windmill.net.Channel;
 public class FileContext
 {
     private final CPU cpu;
-    private final FileCache cache;
+    private final PageCache cache;
 
     private long position;
 
-    public FileContext(CPU cpu, FileCache cache, long position)
+    public FileContext(CPU cpu, PageCache cache, long position)
     {
         this.cpu = cpu;
         this.cache = cache;

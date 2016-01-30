@@ -4,7 +4,7 @@ import java.io.RandomAccessFile;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
-import io.windmill.disk.cache.FileCache;
+import io.windmill.disk.cache.PageCache;
 import io.windmill.net.Channel;
 
 import io.netty.buffer.ByteBuf;
@@ -14,14 +14,14 @@ import io.windmill.utils.Futures;
 public class File
 {
     protected final CPU cpu;
-    protected final FileCache cache;
+    protected final PageCache cache;
 
     File(CPU cpu, RandomAccessFile file)
     {
-        this(cpu, new FileCache(cpu, file.getChannel()));
+        this(cpu, new PageCache(cpu, file.getChannel()));
     }
 
-    private File(CPU cpu, FileCache cache)
+    private File(CPU cpu, PageCache cache)
     {
         this.cpu = cpu;
         this.cache = cache;

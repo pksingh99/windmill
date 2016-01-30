@@ -18,12 +18,12 @@ import io.windmill.utils.Futures;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class FileCacheTest extends AbstractTest
+public class PageCacheTest extends AbstractTest
 {
     @Test
     public void testGetAndCreate() throws Throwable
     {
-        FileCache cache = new FileCache(CPUs.get(0), generateTmpFile(513 * Page.PAGE_SIZE));
+        PageCache cache = new PageCache(CPUs.get(0), generateTmpFile(513 * Page.PAGE_SIZE));
         IntObjectMap<Page> existingPages = new IntObjectHashMap<>();
 
         try
@@ -53,7 +53,7 @@ public class FileCacheTest extends AbstractTest
     {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         FileChannel file = generateTmpFile(0);
-        FileCache cache = new FileCache(CPUs.get(0), file);
+        PageCache cache = new PageCache(CPUs.get(0), file);
 
         try
         {
@@ -98,7 +98,7 @@ public class FileCacheTest extends AbstractTest
     public void testCacheMarking() throws Throwable
     {
         int numPages = 12288;
-        FileCache cache = new FileCache(CPUs.get(0), generateTmpFile(numPages * Page.PAGE_SIZE));
+        PageCache cache = new PageCache(CPUs.get(0), generateTmpFile(numPages * Page.PAGE_SIZE));
         IntObjectMap<Page> dirtyPages = new IntObjectHashMap<>();
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
@@ -147,7 +147,7 @@ public class FileCacheTest extends AbstractTest
         Futures.await(cache.close());
 
         // let's just see if a single page in the cache is going to be properly marked as dirty/clean
-        cache = new FileCache(CPUs.get(2), generateTmpFile(Page.PAGE_SIZE));
+        cache = new PageCache(CPUs.get(2), generateTmpFile(Page.PAGE_SIZE));
         Page page = Futures.await(cache.getOrCreate(0));
         page.write((short) 0, Unpooled.buffer(1).writeByte('b'));
 
@@ -162,7 +162,7 @@ public class FileCacheTest extends AbstractTest
         Futures.await(cache.close());
 
         // let's try to mark random pages in the empty tree
-        cache = new FileCache(CPUs.get(0), generateTmpFile(0));
+        cache = new PageCache(CPUs.get(0), generateTmpFile(0));
 
         for (int i = 0; i < 512; i++)
             cache.markPageDirty(random.nextInt(0, 12228));
