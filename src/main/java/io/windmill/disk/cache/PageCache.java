@@ -17,8 +17,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.collection.IntObjectMap;
 
-import com.google.common.base.Preconditions;
-
 /**
  * This cache implementation is based on Linux Kernel implementation of Radix Tree (https://lwn.net/Articles/175432/)
  * Having 6 levels of nodes with 64 slots each and 4K pages allows for 17TB files.
@@ -74,6 +72,42 @@ public class PageCache
     }
 
     /**
+     * Iterate over every available page and apply given consumer function.
+     *
+     * @param pageConsumer The function to apply on existing pages.
+     */
+    public void forEach(Consumer<Page> pageConsumer)
+    {
+        if (root == null)
+            return;
+
+        if (root.isDataNode())
+        {
+            pageConsumer.accept(root.page);
+            return;
+        }
+
+        forEach(root, pageConsumer);
+    }
+
+    private void forEach(Node node, Consumer<Page> pageConsumer)
+    {
+        // it's safe to to use recursion here since it's depth is bounded by CACHE_NODE_SHIFT
+        for (int i = 0; i < node.slots.length; i++)
+        {
+            Node slot = node.slots[i];
+
+            if (slot == null)
+                continue;
+
+            if (slot.isDataNode())
+                pageConsumer.accept(slot.page);
+            else
+                forEach(slot, pageConsumer);
+        }
+    }
+
+    /**
      * Retrieve or allocate new page at given offset
      *
      * @param pageOffset The offset for page in the tree (must be PAGE_SIZE aligned)
@@ -97,7 +131,7 @@ public class PageCache
      */
     private Node search(int pageOffset)
     {
-        Preconditions.checkArgument(pageOffset >= 0);
+        assert pageOffset >= 0;
 
         Node node = root;
 
@@ -170,7 +204,7 @@ public class PageCache
      */
     public void markPageClean(int pageOffset)
     {
-        Preconditions.checkArgument(pageOffset >= 0);
+        assert pageOffset >= 0;
         if (root == null || pageOffset > HEIGHT_TO_MAX_INDEX[root.height])
             return;
 
@@ -240,6 +274,11 @@ public class PageCache
 
     public Future<Void> close()
     {
+        return close(null);
+    }
+
+    public Future<Void> close(Consumer<Page> pageConsumer)
+    {
         Future<Void> closePromise = new Future<>(cpu);
 
         // let's try to sync up dirty pages first
@@ -250,6 +289,9 @@ public class PageCache
                 file.close();
                 return null;
             });
+
+            if (pageConsumer != null)
+                forEach(pageConsumer::accept);
 
             close.onSuccess(closePromise::setValue);
             close.onFailure(closePromise::setFailure);
@@ -286,7 +328,7 @@ public class PageCache
             return dirtyPages;
 
         node.forEachDirty((slot) -> {
-            Preconditions.checkNotNull(slot);
+            assert slot != null;
 
             if (slot.isDataNode())
                 dirtyPages.add(slot.page);
@@ -299,7 +341,7 @@ public class PageCache
 
     private Future<Page> allocatePage(int pageOffset)
     {
-        Preconditions.checkArgument(pageOffset >= 0);
+        assert pageOffset >= 0;
 
         if (root == null || pageOffset > HEIGHT_TO_MAX_INDEX[root.height])
             expandTree(pageOffset); // extend a tree to be able to hold given index
@@ -366,6 +408,8 @@ public class PageCache
 
             return new Page(this, pageOffset, buffer);
         });
+
+        loadingPages.put(pageOffset, pageFuture);
 
         pageFuture.onSuccess(insertionPoint::setPage);
         pageFuture.onComplete(() -> loadingPages.remove(pageOffset));

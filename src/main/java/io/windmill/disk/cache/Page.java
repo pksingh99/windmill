@@ -30,6 +30,11 @@ public class Page
         this.buffer = buffer;
     }
 
+    public int getOffset()
+    {
+        return pageOffset;
+    }
+
     public boolean isDirty()
     {
         return dirtyBlocks != 0;

@@ -34,4 +34,21 @@ public class CPUSetTest
         Assert.assertEquals(3, socket1.getCPU(1).id);
         Assert.assertEquals(4, socket1.getCPU(2).id);
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNegativePageCacheSize()
+    {
+        CPUSet.builder().setPageCacheSize(-1);
+    }
+
+    @Test
+    public void testSettingPageCacheSize()
+    {
+        CPUSet.Builder builder = CPUSet.builder();
+        Assert.assertEquals(CPUSet.DEFAULT_PAGE_CACHE_SIZE, builder.pageCacheSize);
+
+        builder.setPageCacheSize(10);
+        Assert.assertEquals(10, builder.pageCacheSize);
+    }
+
 }

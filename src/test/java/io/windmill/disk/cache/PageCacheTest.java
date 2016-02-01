@@ -7,6 +7,7 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -23,7 +24,7 @@ public class PageCacheTest extends AbstractTest
     @Test
     public void testGetAndCreate() throws Throwable
     {
-        PageCache cache = new PageCache(CPUs.get(0), generateTmpFile(513 * Page.PAGE_SIZE));
+        PageCache cache = new PageCache(CPUs.get(0), generateTmpFile(createTmpFile(), 513 * Page.PAGE_SIZE));
         IntObjectMap<Page> existingPages = new IntObjectHashMap<>();
 
         try
@@ -52,7 +53,7 @@ public class PageCacheTest extends AbstractTest
     public void testSync() throws Throwable
     {
         ThreadLocalRandom random = ThreadLocalRandom.current();
-        FileChannel file = generateTmpFile(0);
+        FileChannel file = generateTmpFile(createTmpFile(), 0);
         PageCache cache = new PageCache(CPUs.get(0), file);
 
         try
@@ -98,7 +99,7 @@ public class PageCacheTest extends AbstractTest
     public void testCacheMarking() throws Throwable
     {
         int numPages = 12288;
-        PageCache cache = new PageCache(CPUs.get(0), generateTmpFile(numPages * Page.PAGE_SIZE));
+        PageCache cache = new PageCache(CPUs.get(0), generateTmpFile(createTmpFile(), numPages * Page.PAGE_SIZE));
         IntObjectMap<Page> dirtyPages = new IntObjectHashMap<>();
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
@@ -147,7 +148,7 @@ public class PageCacheTest extends AbstractTest
         Futures.await(cache.close());
 
         // let's just see if a single page in the cache is going to be properly marked as dirty/clean
-        cache = new PageCache(CPUs.get(2), generateTmpFile(Page.PAGE_SIZE));
+        cache = new PageCache(CPUs.get(2), generateTmpFile(createTmpFile(), Page.PAGE_SIZE));
         Page page = Futures.await(cache.getOrCreate(0));
         page.write((short) 0, Unpooled.buffer(1).writeByte('b'));
 
@@ -162,7 +163,7 @@ public class PageCacheTest extends AbstractTest
         Futures.await(cache.close());
 
         // let's try to mark random pages in the empty tree
-        cache = new PageCache(CPUs.get(0), generateTmpFile(0));
+        cache = new PageCache(CPUs.get(0), generateTmpFile(createTmpFile(), 0));
 
         for (int i = 0; i < 512; i++)
             cache.markPageDirty(random.nextInt(0, 12228));
@@ -179,12 +180,57 @@ public class PageCacheTest extends AbstractTest
         Futures.await(cache.close());
     }
 
-    private static FileChannel generateTmpFile(long fileLength) throws IOException
+    @Test
+    public void testForEach() throws Throwable
+    {
+        int numPages = 12;
+        PageCache cache = new PageCache(CPUs.get(0), generateTmpFile(createTmpFile(), numPages * Page.PAGE_SIZE));
+
+        CountingPageConsumer pageConsumer;
+
+        // pre-fault of all of the existing pages
+        for (int i = 0; i < numPages; i++)
+        {
+            pageConsumer = new CountingPageConsumer();
+            cache.forEach(pageConsumer);
+            Assert.assertEquals(i, pageConsumer.getCount());
+
+            Futures.await(cache.getOrCreate(i));
+        }
+
+        pageConsumer = new CountingPageConsumer();
+        cache.forEach(pageConsumer);
+        Assert.assertEquals(numPages, pageConsumer.getCount());
+
+        // evict random page
+        Futures.await(cache.evictPage(ThreadLocalRandom.current().nextInt(0, numPages)));
+
+        pageConsumer = new CountingPageConsumer();
+        cache.forEach(pageConsumer);
+        Assert.assertEquals(numPages - 1, pageConsumer.getCount());
+
+        // evict the rest of the pages
+        for (int i = 0; i < numPages; i++)
+            Futures.await(cache.evictPage(i));
+
+        pageConsumer = new CountingPageConsumer();
+        cache.forEach(pageConsumer);
+        Assert.assertEquals(0, pageConsumer.getCount());
+    }
+
+    public static String generateTmpFile(long fileLength) throws IOException
+    {
+        String path = createTmpFile();
+        generateTmpFile(path, fileLength).close();
+        return path;
+    }
+
+    public static FileChannel generateTmpFile(String absolutePath, long fileLength) throws IOException
     {
         File tmp = File.createTempFile("random-file-cache-", ".db");
         tmp.deleteOnExit();
 
-        RandomAccessFile file = new RandomAccessFile(tmp, "rw");
+        RandomAccessFile file = new RandomAccessFile(absolutePath, "rw");
 
         while (fileLength > 0)
         {
@@ -198,5 +244,29 @@ public class PageCacheTest extends AbstractTest
         }
 
         return file.getChannel();
+    }
+
+    private static String createTmpFile() throws IOException
+    {
+        File tmp = File.createTempFile("random-file-cache-", ".db");
+        tmp.deleteOnExit();
+
+        return tmp.getAbsolutePath();
+    }
+
+    public static class CountingPageConsumer implements Consumer<Page>
+    {
+        private int count = 0;
+
+        @Override
+        public void accept(Page page)
+        {
+            count++;
+        }
+
+        public int getCount()
+        {
+            return count;
+        }
     }
 }

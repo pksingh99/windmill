@@ -14,12 +14,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import io.windmill.core.CPUSet;
 import io.windmill.core.Future;
 import io.windmill.disk.cache.Page;
+import io.windmill.disk.cache.PageCacheTest;
+import io.windmill.disk.cache.PageCacheTest.CountingPageConsumer;
 import io.windmill.net.Channel;
 import io.windmill.net.io.InputStream;
 import io.windmill.net.io.OutputStream;
 import io.windmill.utils.Futures;
 
-import com.google.common.util.concurrent.Uninterruptibles;
+import com.github.benmanes.caffeine.cache.Cache;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -56,7 +58,7 @@ public class FileTest
             f.close();
         });
 
-        Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.SECONDS);
+        Futures.awaitUninterruptibly(latch, 1, TimeUnit.SECONDS);
         Assert.assertTrue(fileFuture.isSuccess());
     }
 
@@ -71,7 +73,7 @@ public class FileTest
             exception.set((IOException) e);
         });
 
-        Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.SECONDS);
+        Futures.awaitUninterruptibly(latch, 1, TimeUnit.SECONDS);
 
         Assert.assertTrue(fileFuture.isFailure());
         Assert.assertEquals(FileNotFoundException.class, exception.get().getClass());
@@ -208,7 +210,7 @@ public class FileTest
                     latch.countDown();
             });
 
-            Uninterruptibles.awaitUninterruptibly(latch);
+            Futures.awaitUninterruptibly(latch);
 
             // all of the regions should be valid to comply
             Assert.assertTrue(result.get());
@@ -217,6 +219,51 @@ public class FileTest
         {
             Futures.await(file.close());
         }
+    }
+
+    @Test
+    public void testPageTracker() throws Throwable
+    {
+        int numPages = 3;
+        File file = Futures.await(CPU.open(PageCacheTest.generateTmpFile(numPages * Page.PAGE_SIZE), "rw"));
+        Cache<PageRef, Boolean> pageTracker = file.ioService.pageTracker;
+
+        // let's invalidate everything currently in the tracker
+        pageTracker.invalidateAll();
+
+        // and now re-fault all pages we have
+        for (int i = 0; i < numPages; i++)
+            Futures.await(file.read(i * Page.PAGE_SIZE, 1));
+
+        Assert.assertEquals(3, pageTracker.estimatedSize());
+
+        int evictedOffset = ThreadLocalRandom.current().nextInt(0, numPages);
+        // let's evict one page and see if read from file brings it back up
+        pageTracker.invalidate(new PageRef(file, evictedOffset));
+
+        // because we can't track when page is actually evicted since it's async
+        Futures.sleepUninterruptibly(10, TimeUnit.MILLISECONDS);
+
+        Assert.assertEquals(2, pageTracker.estimatedSize());
+
+        CountingPageConsumer pageConsumer = new CountingPageConsumer();
+        file.cache.forEach(pageConsumer);
+        Assert.assertEquals(2, pageConsumer.getCount());
+
+        Futures.await(file.read(evictedOffset * Page.PAGE_SIZE, 1));
+
+        Assert.assertEquals(3, pageTracker.estimatedSize());
+        pageConsumer = new CountingPageConsumer();
+        file.cache.forEach(pageConsumer);
+        Assert.assertEquals(3, pageConsumer.getCount());
+
+        // should evict everything from page tracker
+        Futures.await(file.close());
+
+        Assert.assertEquals(0, pageTracker.estimatedSize());
+        pageConsumer = new CountingPageConsumer();
+        file.cache.forEach(pageConsumer);
+        Assert.assertEquals(0, pageConsumer.getCount());
     }
 
     private byte[] getInt(int n)

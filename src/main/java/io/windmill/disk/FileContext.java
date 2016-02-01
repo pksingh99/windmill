@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import io.windmill.core.CPU;
 import io.windmill.core.Future;
-import io.windmill.disk.cache.PageCache;
 import io.windmill.disk.cache.Page;
 
 import io.netty.buffer.ByteBuf;
@@ -15,15 +13,13 @@ import io.windmill.net.Channel;
 
 public class FileContext
 {
-    private final CPU cpu;
-    private final PageCache cache;
 
+    private final File file;
     private long position;
 
-    public FileContext(CPU cpu, PageCache cache, long position)
+    public FileContext(File file, long position)
     {
-        this.cpu = cpu;
-        this.cache = cache;
+        this.file = file;
         this.position = position;
     }
 
@@ -82,14 +78,14 @@ public class FileContext
         while (size > 0)
         {
             int toTransfer = (int) Math.min(Page.PAGE_SIZE - offset, size);
-            transfers.add(cache.transferPage(channel, pageOffset, offset, toTransfer));
+            transfers.add(file.cache.transferPage(channel, pageOffset, offset, toTransfer));
 
             pageOffset++;
             offset = 0; // only first page has aligned offset
             size -= toTransfer;
         }
 
-        return cpu.sequence(transfers).map((sizes) -> {
+        return file.cpu.sequence(transfers).map((sizes) -> {
             long total = 0;
             for (Long transferSize : sizes)
                 total += transferSize;
@@ -105,14 +101,19 @@ public class FileContext
 
         // optimization for single page reads
         if (pageCount == 1)
-            return cache.getOrCreate(pageOffset).map(Collections::singletonList);
+        {
+            file.markPageAccess(pageOffset);
+            return file.cache.getOrCreate(pageOffset).map(Collections::singletonList);
+        }
 
         List<Future<Page>> pages = new ArrayList<>(pageCount);
-
         for (int i = 0; i < pageCount; i++)
-            pages.add(cache.getOrCreate(pageOffset + i));
+        {
+            file.markPageAccess(pageOffset);
+            pages.add(file.cache.getOrCreate(pageOffset + i));
+        }
 
-        return cpu.sequence(pages);
+        return file.cpu.sequence(pages);
     }
 
     private static short getPagePosition(long position)

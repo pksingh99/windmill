@@ -9,12 +9,14 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import io.windmill.core.tasks.Task0;
 import io.windmill.core.tasks.Task2;
 import io.windmill.core.tasks.VoidTask0;
 import io.windmill.disk.File;
 import io.windmill.disk.IOService;
 import io.windmill.disk.IOTask;
+import io.windmill.disk.PageRef;
 import io.windmill.net.Channel;
 import io.windmill.net.Network;
 import io.windmill.utils.IOUtils;
@@ -53,13 +55,13 @@ public class CPU
     protected final Network network;
     protected final DelayQueue<TimerTask> timers;
 
-    CPU(CpuLayout layout, int cpuId, CPUSet.Socket socket)
+    CPU(CpuLayout layout, int cpuId, CPUSet.Socket socket, Cache<PageRef, Boolean> pageTracker)
     {
         this.layout = layout;
         this.id = cpuId;
         this.socket = socket;
         this.runQueue = RingBuffer.create(ProducerType.MULTI, WorkEvent::new, 1 << 20, new BusySpinWaitStrategy());
-        this.io = new IOService(this, DEFAULT_IO_THREADS);
+        this.io = new IOService(this, pageTracker, DEFAULT_IO_THREADS);
         this.network = new Network(this);
         this.timers = new DelayQueue<>();
     }

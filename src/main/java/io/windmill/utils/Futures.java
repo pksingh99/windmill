@@ -1,12 +1,11 @@
 package io.windmill.utils;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
-
-import com.google.common.util.concurrent.Uninterruptibles;
 
 public class Futures
 {
@@ -23,7 +22,7 @@ public class Futures
         future.onFailure(exception::set);
         future.onComplete(latch::countDown);
 
-        Uninterruptibles.awaitUninterruptibly(latch);
+        awaitUninterruptibly(latch);
 
         if (future.isFailure())
             throw exception.get();
@@ -61,6 +60,100 @@ public class Futures
         {
             super(cpu);
             setValue(value);
+        }
+    }
+
+    /* await/sleep methods where taken from Guava utilities and slightly modified */
+
+    /**
+     * Invokes {@code latch.}{@link CountDownLatch#await() await()} uninterruptibly.
+     */
+    public static void awaitUninterruptibly(CountDownLatch latch)
+    {
+        boolean interrupted = false;
+        try
+        {
+            while (true)
+            {
+                try
+                {
+                    latch.await();
+                    return;
+                }
+                catch (InterruptedException e)
+                {
+                    interrupted = true;
+                }
+            }
+        }
+        finally
+        {
+            if (interrupted)
+                Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Invokes {@code latch.}{@link CountDownLatch#await(long, TimeUnit) await(timeout, unit)} uninterruptibly.
+     */
+    public static boolean awaitUninterruptibly(CountDownLatch latch, long timeout, TimeUnit unit)
+    {
+        boolean interrupted = false;
+        try
+        {
+            long remainingNanos = unit.toNanos(timeout);
+            long end = System.nanoTime() + remainingNanos;
+
+            while (true)
+            {
+                try
+                {
+                    // CountDownLatch treats negative timeouts just like zero.
+                    return latch.await(remainingNanos, TimeUnit.NANOSECONDS);
+                }
+                catch (InterruptedException e)
+                {
+                    interrupted = true;
+                    remainingNanos = end - System.nanoTime();
+                }
+            }
+        }
+        finally
+        {
+            if (interrupted)
+                Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Invokes {@code unit.}{@link TimeUnit#sleep(long) sleep(sleepFor)} uninterruptibly.
+     */
+    public static void sleepUninterruptibly(long sleepFor, TimeUnit unit)
+    {
+        boolean interrupted = false;
+        try
+        {
+            long remainingNanos = unit.toNanos(sleepFor);
+            long end = System.nanoTime() + remainingNanos;
+            while (true)
+            {
+                try
+                {
+                    // TimeUnit.sleep() treats negative timeouts just like zero.
+                    TimeUnit.NANOSECONDS.sleep(remainingNanos);
+                    return;
+                }
+                catch (InterruptedException e)
+                {
+                    interrupted = true;
+                    remainingNanos = end - System.nanoTime();
+                }
+            }
+        }
+        finally
+        {
+            if (interrupted)
+                Thread.currentThread().interrupt();
         }
     }
 }
