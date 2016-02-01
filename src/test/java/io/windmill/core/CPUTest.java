@@ -14,8 +14,6 @@ import io.windmill.net.io.InputStream;
 import io.windmill.net.io.OutputStream;
 import io.windmill.utils.Futures;
 
-import com.google.common.util.concurrent.Uninterruptibles;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -42,7 +40,7 @@ public class CPUTest extends AbstractTest
             }
         });
 
-        Uninterruptibles.awaitUninterruptibly(latch);
+        Futures.awaitUninterruptibly(latch);
     }
 
     @Test
@@ -111,11 +109,11 @@ public class CPUTest extends AbstractTest
 
         cpu.sleep(500, TimeUnit.MILLISECONDS, counts::incrementAndGet);
 
-        Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+        Futures.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
         Assert.assertEquals(5, counts.get());
 
         // sleep a bit for to get 6th count
-        Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+        Futures.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
         Assert.assertEquals(6, counts.get());
     }
 

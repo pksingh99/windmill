@@ -1,4 +1,4 @@
-package io.windmill.io;
+package io.windmill.disk;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -9,25 +9,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
+
 import net.openhft.affinity.AffinitySupport;
+
+import com.github.benmanes.caffeine.cache.Cache;
 
 public class IOService implements AutoCloseable
 {
-    private final CPU cpu;
-    private final ExecutorService io;
+    protected final CPU cpu;
+    protected final ExecutorService io;
+    protected final Cache<PageRef, Boolean> pageTracker;
 
-    public IOService(CPU cpu, int numThreads)
+    public IOService(CPU cpu, Cache<PageRef, Boolean> pageTracker, int numThreads)
     {
         this.cpu = cpu;
         this.io = Executors.newFixedThreadPool(numThreads, new LayoutAwareThreadFactory(cpu));
+        this.pageTracker = pageTracker;
     }
 
     public Future<File> open(String path, String mode)
     {
-        return schedule(() -> new File(this, new RandomAccessFile(path, mode)));
+        return schedule(() -> new File(cpu, this, new RandomAccessFile(path, mode)));
     }
 
-    <O> Future<O> schedule(IOTask<O> task)
+    public CPU getCPU()
+    {
+        return cpu;
+    }
+
+    public <O> Future<O> schedule(IOTask<O> task)
     {
         Future<O> future = new Future<>(cpu);
         io.execute(() -> {
@@ -48,6 +58,16 @@ public class IOService implements AutoCloseable
             }
         });
         return future;
+    }
+
+    void markPageAccessed(File file, int pageOffset)
+    {
+        pageTracker.put(new PageRef(file, pageOffset), true);
+    }
+
+    void markPageEvicted(File file, int pageOffset)
+    {
+        pageTracker.invalidate(new PageRef(file, pageOffset));
     }
 
     @Override
@@ -81,4 +101,5 @@ public class IOService implements AutoCloseable
             return newThread;
         }
     }
+
 }

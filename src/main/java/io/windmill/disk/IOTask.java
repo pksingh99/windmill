@@ -1,4 +1,4 @@
-package io.windmill.io;
+package io.windmill.disk;
 
 import java.io.IOException;
 

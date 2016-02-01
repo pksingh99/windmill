@@ -8,8 +8,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import io.windmill.core.tasks.Task1;
 import io.windmill.utils.Futures;
 
-import com.google.common.util.concurrent.Uninterruptibles;
-
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -64,7 +62,7 @@ public class FutureTest extends AbstractTest
 
         setValue(cpu, futureA, 42);
 
-        Uninterruptibles.awaitUninterruptibly(latchA);
+        Futures.awaitUninterruptibly(latchA);
         Assert.assertEquals(42, result.get());
 
         result.set(0);
@@ -75,7 +73,7 @@ public class FutureTest extends AbstractTest
         futureA.map((n) -> mapTask(result, latchB).compute(n));
         futureA.map((n) -> mapTask(result, latchB).compute(n));
 
-        Uninterruptibles.awaitUninterruptibly(latchB);
+        Futures.awaitUninterruptibly(latchB);
         Assert.assertEquals(84, result.get());
 
         result.set(0);
@@ -89,7 +87,7 @@ public class FutureTest extends AbstractTest
 
         setValue(cpu, futureB, 1);
 
-        Uninterruptibles.awaitUninterruptibly(latchC);
+        Futures.awaitUninterruptibly(latchC);
         Assert.assertEquals(2, result.get());
     }
 
@@ -116,7 +114,7 @@ public class FutureTest extends AbstractTest
             setValue(42);
         }});
 
-        Uninterruptibles.awaitUninterruptibly(latchA);
+        Futures.awaitUninterruptibly(latchA);
         Assert.assertEquals(42, result.get());
 
         Future<Future<Integer>> futureB = new Future<>(cpu);
@@ -132,7 +130,7 @@ public class FutureTest extends AbstractTest
         RuntimeException ex = new RuntimeException();
         setValue(cpu, futureB, new Future<Integer>(cpu) {{ setFailure(ex); }});
 
-        Uninterruptibles.awaitUninterruptibly(latchB);
+        Futures.awaitUninterruptibly(latchB);
         Assert.assertEquals(ex, failure.get());
     }
 
@@ -151,7 +149,7 @@ public class FutureTest extends AbstractTest
 
         setValue(cpu, futureA, 42);
 
-        Uninterruptibles.awaitUninterruptibly(latchA);
+        Futures.awaitUninterruptibly(latchA);
         Assert.assertEquals(42, result.get());
 
         result.set(0);
@@ -162,7 +160,7 @@ public class FutureTest extends AbstractTest
         futureA.onSuccess((n) -> mapTask(result, latchB).compute(n));
         futureA.onSuccess((n) -> mapTask(result, latchB).compute(n));
 
-        Uninterruptibles.awaitUninterruptibly(latchB);
+        Futures.awaitUninterruptibly(latchB);
         Assert.assertEquals(84, result.get());
 
         result.set(0);
@@ -176,7 +174,7 @@ public class FutureTest extends AbstractTest
 
         setValue(cpu, futureB, 1);
 
-        Uninterruptibles.awaitUninterruptibly(latchC);
+        Futures.awaitUninterruptibly(latchC);
         Assert.assertEquals(2, result.get());
     }
 
@@ -195,7 +193,7 @@ public class FutureTest extends AbstractTest
 
         setFailure(cpu, failedFuture, ex);
 
-        Uninterruptibles.awaitUninterruptibly(latchA);
+        Futures.awaitUninterruptibly(latchA);
 
         Assert.assertTrue(failedFuture.isAvailable());
         Assert.assertTrue(failedFuture.isFailure());
@@ -208,7 +206,7 @@ public class FutureTest extends AbstractTest
         CountDownLatch latchB = new CountDownLatch(1);
         failedFuture.onFailure((e) -> exceptionTask(exception, latchB).compute(e));
 
-        Uninterruptibles.awaitUninterruptibly(latchB);
+        Futures.awaitUninterruptibly(latchB);
 
         Assert.assertTrue(failedFuture.isAvailable());
         Assert.assertTrue(failedFuture.isFailure());
@@ -218,7 +216,7 @@ public class FutureTest extends AbstractTest
         CountDownLatch latchC = new CountDownLatch(1);
         failedFuture.onFailure((e) -> mapTask(universalNumber, latchC).compute(42));
 
-        Uninterruptibles.awaitUninterruptibly(latchC);
+        Futures.awaitUninterruptibly(latchC);
         Assert.assertEquals(42, universalNumber.get());
 
         universalNumber.set(0);
@@ -231,7 +229,7 @@ public class FutureTest extends AbstractTest
 
         setFailure(cpu, unresolvedFailure, new RuntimeException());
 
-        Uninterruptibles.awaitUninterruptibly(latchD);
+        Futures.awaitUninterruptibly(latchD);
         Assert.assertEquals(42, universalNumber.get());
     }
 
@@ -274,7 +272,7 @@ public class FutureTest extends AbstractTest
             return null;
         });
 
-        Uninterruptibles.awaitUninterruptibly(latch);
+        Futures.awaitUninterruptibly(latch);
 
         try
         {
@@ -323,7 +321,7 @@ public class FutureTest extends AbstractTest
         });
 
         setValue(CPUs.get(0), future, 42);
-        Uninterruptibles.awaitUninterruptibly(latch);
+        Futures.awaitUninterruptibly(latch);
 
         Assert.assertTrue(future.isSuccess());
         Assert.assertEquals(CPUs.get(2).getId(), threadId.get());
@@ -354,7 +352,7 @@ public class FutureTest extends AbstractTest
             latch.countDown();
         });
 
-        Uninterruptibles.awaitUninterruptibly(latch);
+        Futures.awaitUninterruptibly(latch);
         Assert.assertTrue(a.isSuccess());
         Assert.assertTrue(b.isFailure());
 
@@ -381,7 +379,7 @@ public class FutureTest extends AbstractTest
         b.onComplete(latchA::countDown);
         b.onComplete(latchA::countDown);
 
-        Uninterruptibles.awaitUninterruptibly(latchA);
+        Futures.awaitUninterruptibly(latchA);
 
         Assert.assertTrue(a.isFailure());
         Assert.assertTrue(b.isFailure());
@@ -401,7 +399,7 @@ public class FutureTest extends AbstractTest
 
         setFailure(cpuA, d, exceptionB);
 
-        Uninterruptibles.awaitUninterruptibly(latchB);
+        Futures.awaitUninterruptibly(latchB);
 
         Assert.assertTrue(d.isFailure());
         Assert.assertTrue(e.isFailure());

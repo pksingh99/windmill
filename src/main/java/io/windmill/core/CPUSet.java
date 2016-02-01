@@ -2,13 +2,16 @@ package io.windmill.core;
 
 import java.io.IOException;
 import java.nio.channels.ServerSocketChannel;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
+import io.windmill.disk.PageRef;
+import io.windmill.disk.cache.Page;
 import io.windmill.net.Channel;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.*;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 
 import net.openhft.affinity.CpuLayout;
 import net.openhft.affinity.impl.VanillaCpuLayout;
@@ -20,12 +23,14 @@ public class CPUSet
 {
     private static final Logger logger = LoggerFactory.getLogger(CPUSet.class);
 
-    private final ImmutableMap<Integer, Socket> sockets;
-    private final ImmutableMap<Integer, CPU> cpus;
+    public static final int DEFAULT_PAGE_CACHE_SIZE =  512 * 1024 * 1024;  // 512 MB by default
 
-    private CPUSet(ImmutableMap<Integer, Socket> sockets)
+    private final Map<Integer, Socket> sockets;
+    private final Map<Integer, CPU> cpus;
+
+    private CPUSet(Map<Integer, Socket> sockets)
     {
-        ImmutableMap.Builder<Integer, CPU> cpus = ImmutableMap.builder();
+        Map<Integer, CPU> cpus = new HashMap<>();
         for (Socket socket : sockets.values())
         {
             for (CPU cpu : socket.cpus)
@@ -33,7 +38,7 @@ public class CPUSet
         }
 
         this.sockets = sockets;
-        this.cpus = cpus.build();
+        this.cpus = Collections.unmodifiableMap(cpus);
     }
 
     public CPU get(int cpuId)
@@ -64,8 +69,11 @@ public class CPUSet
     public static class Builder
     {
         private int socketId = 0;
-        private final ImmutableMap.Builder<Integer, Socket> sockets = ImmutableMap.builder();
+
+        private final Map<Integer, int[]> sockets = new HashMap<>();
         private final CpuLayout layout;
+
+        protected long pageCacheSize = DEFAULT_PAGE_CACHE_SIZE;
 
         public Builder()
         {
@@ -84,7 +92,6 @@ public class CPUSet
             this.layout = layout;
         }
 
-        @VisibleForTesting
         protected Builder(CpuLayout layout)
         {
             this.layout = layout;
@@ -101,13 +108,31 @@ public class CPUSet
                     throw new IllegalArgumentException(String.format("Insufficient CPU cores per socket, total %d, tried to allocate %d.", layout.coresPerSocket(), cpuIds.length));
             }
 
-            sockets.put(socketId++, new Socket(layout, cpuIds));
+            sockets.put(socketId++, cpuIds);
+            return this;
+        }
+
+        public Builder setPageCacheSize(long pageCacheSize)
+        {
+            if (pageCacheSize <= 0)
+                throw new IllegalArgumentException("page cache size should be positive");
+
+            this.pageCacheSize = pageCacheSize;
             return this;
         }
 
         public CPUSet build()
         {
-            return new CPUSet(sockets.build());
+            Cache<PageRef, Boolean> pageTracker = Caffeine.<PageRef, Boolean>newBuilder()
+                                                          .maximumSize(pageCacheSize / Page.PAGE_SIZE)
+                                                          .removalListener((PageRef page, Boolean v, RemovalCause cause) -> page.evict())
+                                                          .build();
+
+            Map<Integer, Socket> cpuSet = new HashMap<>();
+            for (Map.Entry<Integer, int[]> socket : sockets.entrySet())
+                cpuSet.put(socket.getKey(), new Socket(layout, pageTracker, socket.getValue()));
+
+            return new CPUSet(Collections.unmodifiableMap(cpuSet));
         }
     }
 
@@ -115,13 +140,13 @@ public class CPUSet
     {
         private final List<CPU> cpus;
 
-        private Socket(CpuLayout layout, int... cpuIds)
+        private Socket(CpuLayout layout, Cache<PageRef, Boolean> pageTracker, int... cpuIds)
         {
-            ImmutableList.Builder<CPU> cpus = ImmutableList.builder();
+            List<CPU> cpus = new ArrayList<>(cpuIds.length);
             for (int cpuId : cpuIds)
-                cpus.add(new CPU(layout, cpuId, this));
+                cpus.add(new CPU(layout, cpuId, this, pageTracker));
 
-            this.cpus = cpus.build();
+            this.cpus = Collections.unmodifiableList(cpus);
         }
 
         public void start()
