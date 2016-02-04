@@ -161,10 +161,10 @@ public class FileTest
             // evict random page to test situation when there are holes in the cache
             Futures.await(file.cache.evictPage(ThreadLocalRandom.current().nextInt(1, 4)));
 
-            CPU.listen(new InetSocketAddress("127.0.0.1", 31338)).onSuccess((c) -> {
+            CPU.listen(new InetSocketAddress("127.0.0.1", 31338), (c) -> {
                 InputStream in = c.getInput();
                 c.loop((cpu, prev) -> in.read(8).map((header) -> file.transferTo(c, header.readInt(), header.readInt())));
-            });
+            }, Throwable::printStackTrace);
 
             Future<Channel> client = CPU.connect(new InetSocketAddress("127.0.0.1", 31338));
 

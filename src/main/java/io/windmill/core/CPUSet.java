@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.nio.channels.ServerSocketChannel;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 
+import io.windmill.core.tasks.VoidTask1;
 import io.windmill.disk.PageRef;
 import io.windmill.disk.cache.Page;
 import io.windmill.net.Channel;
@@ -49,6 +51,11 @@ public class CPUSet
     public Socket getSocket(int id)
     {
         return sockets.get(id);
+    }
+
+    public void forEach(Consumer<CPU> consumer)
+    {
+        cpus.forEach((id, cpu) -> consumer.accept(cpu));
     }
 
     public void start()
@@ -175,7 +182,7 @@ public class CPUSet
             return cpus.size();
         }
 
-        public void register(ServerSocketChannel channel, Future<Channel> promise)
+        public void register(ServerSocketChannel channel, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure)
         {
             if (channel == null)
                 return;
@@ -184,11 +191,11 @@ public class CPUSet
 
             try
             {
-                promise.setValue(new Channel(cpu, cpu.getSelector(), channel.accept()));
+                onAccept.compute(new Channel(cpu, cpu.getSelector(), channel.accept()));
             }
             catch (Exception | Error e)
             {
-                promise.setFailure(e);
+                onFailure.compute(e);
             }
         }
     }

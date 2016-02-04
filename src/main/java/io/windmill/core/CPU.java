@@ -13,6 +13,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import io.windmill.core.tasks.Task0;
 import io.windmill.core.tasks.Task2;
 import io.windmill.core.tasks.VoidTask0;
+import io.windmill.core.tasks.VoidTask1;
 import io.windmill.disk.File;
 import io.windmill.disk.IOService;
 import io.windmill.disk.IOTask;
@@ -76,9 +77,9 @@ public class CPU
         return layout;
     }
 
-    public Future<Channel> listen(InetSocketAddress address)
+    public void listen(InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure)
     {
-        return network.listen(address);
+        network.listen(address, onAccept, onFailure);
     }
 
     public Future<Channel> connect(InetSocketAddress address)

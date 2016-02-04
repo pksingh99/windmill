@@ -5,6 +5,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
+import java.util.Optional;
 import java.util.Queue;
 
 import io.windmill.core.CPU;
@@ -12,6 +13,7 @@ import io.windmill.core.Future;
 import io.windmill.net.TransferTask;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 public class OutputStream implements AutoCloseable
 {
@@ -28,9 +30,26 @@ public class OutputStream implements AutoCloseable
         this.txQueue = new ArrayDeque<>();
     }
 
+    public OutputStream writeInt(int v)
+    {
+        writeBytes(Unpooled.copyInt(v));
+        return this;
+    }
+
+    public OutputStream writeBytes(ByteBuf bytes)
+    {
+        txQueue.add(new TxTask(bytes, Optional.empty()));
+        return this;
+    }
+
+    public Future<Void> flush()
+    {
+        return writeAndFlush(Unpooled.EMPTY_BUFFER).map((v) -> null);
+    }
+
     public Future<Long> writeAndFlush(ByteBuf buffer)
     {
-        return writeAndFlush(new TxTask(buffer, new Future<>(cpu)));
+        return writeAndFlush(new TxTask(buffer, Optional.of(new Future<>(cpu))));
     }
 
     public Future<Long> transferFrom(FileChannel channel, long offset, long length)
@@ -76,7 +95,7 @@ public class OutputStream implements AutoCloseable
 
     private static class TxTask extends TransferTask<SocketChannel, Long>
     {
-        public TxTask(ByteBuf buffer, Future<Long> future)
+        public TxTask(ByteBuf buffer, Optional<Future<Long>> future)
         {
             super(buffer, future);
         }
@@ -91,7 +110,7 @@ public class OutputStream implements AutoCloseable
             if (buffer.readableBytes() > 0)
                 return false;
 
-            onComplete.setValue((long) buffer.readableBytes());
+            onComplete.ifPresent((f) -> f.setValue((long) buffer.readableBytes()));
             return true;
         }
     }
@@ -104,7 +123,7 @@ public class OutputStream implements AutoCloseable
 
         public FileTxTask(FileChannel file, long offset, long length, Future<Long> future)
         {
-            super(null, future);
+            super(null, Optional.of(future));
 
             this.file = file;
             this.offset = offset;
@@ -126,18 +145,18 @@ public class OutputStream implements AutoCloseable
                 if (remaining > 0 && offset < file.size())
                     return false;
 
-                onComplete.setValue(transferred);
+                onComplete.ifPresent((f) -> f.setValue(transferred));
             }
             catch (IOException e)
             {
-                onComplete.setFailure(e);
+                onComplete.ifPresent((f) -> f.setFailure(e));
             }
 
             return true;
         }
     }
 
-    private static boolean writeBytes(ByteBuf buffer, SocketChannel channel, Future<Long> future)
+    private static boolean writeBytes(ByteBuf buffer, SocketChannel channel, Optional<Future<Long>> future)
     {
         try
         {
@@ -145,7 +164,7 @@ public class OutputStream implements AutoCloseable
         }
         catch (IOException e)
         {
-            future.setFailure(e);
+            future.ifPresent((f) -> f.setFailure(e));
             return false;
         }
 

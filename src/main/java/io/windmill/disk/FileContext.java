@@ -6,10 +6,10 @@ import java.util.List;
 
 import io.windmill.core.Future;
 import io.windmill.disk.cache.Page;
+import io.windmill.net.Channel;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.windmill.net.Channel;
 
 public class FileContext
 {

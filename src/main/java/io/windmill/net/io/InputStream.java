@@ -5,6 +5,7 @@ import java.net.SocketException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
+import java.util.Optional;
 import java.util.Queue;
 
 import io.windmill.core.CPU;
@@ -89,7 +90,7 @@ public class InputStream implements AutoCloseable
 
         public RxTask(Future<ByteBuf> request, int size)
         {
-            super(null, request);
+            super(null, Optional.of(request));
             this.size = size;
         }
 
@@ -101,11 +102,11 @@ public class InputStream implements AutoCloseable
 
             try
             {
-                onComplete.setValue(rx.transfer(size));
+                onComplete.ifPresent((f) -> f.setValue(rx.transfer(size)));
             }
             catch (Exception | Error e)
             {
-                onComplete.setFailure(e);
+                onComplete.ifPresent((f) -> f.setFailure(e));
             }
 
             return true;

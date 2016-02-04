@@ -7,13 +7,20 @@ import java.nio.channels.ServerSocketChannel;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
+import io.windmill.core.tasks.VoidTask1;
 import io.windmill.utils.IOUtils;
 
 public class ServerSocket extends Future<Channel> implements AutoCloseable
 {
     private final ServerSocketChannel channel;
+    private final VoidTask1<Channel> onAccept;
+    private final VoidTask1<Throwable> onFailure;
 
-    public ServerSocket(CPU cpu, Selector selector, InetSocketAddress address)
+    public ServerSocket(CPU cpu,
+                        Selector selector,
+                        InetSocketAddress address,
+                        VoidTask1<Channel> onAccept,
+                        VoidTask1<Throwable> onFailure)
     {
         super(cpu);
 
@@ -35,16 +42,18 @@ public class ServerSocket extends Future<Channel> implements AutoCloseable
         }
         catch (Exception | Error e)
         {
-            setFailure(e);
+            cpu.schedule(() -> onFailure.compute(e));
             server = null;
         }
 
         this.channel = server;
+        this.onAccept = onAccept;
+        this.onFailure = onFailure;
     }
 
     protected void onAccept()
     {
-        cpu.getSocket().register(channel, this);
+        cpu.getSocket().register(channel, onAccept, onFailure);
     }
 
     @Override

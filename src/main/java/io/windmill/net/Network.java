@@ -2,11 +2,9 @@ package io.windmill.net;
 
 import java.io.IOError;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Iterator;
 
@@ -26,9 +24,9 @@ public class Network implements AutoCloseable
         this.selector = openSelector();
     }
 
-    public Future<Channel> listen(InetSocketAddress address)
+    public void listen(InetSocketAddress address, VoidTask1<Channel> onAccept, VoidTask1<Throwable> onFailure)
     {
-        return new ServerSocket(cpu, selector, address);
+        new ServerSocket(cpu, selector, address, onAccept, onFailure);
     }
 
     public Future<Channel> connect(InetSocketAddress address)
