@@ -1,4 +1,4 @@
-package io.windmill.examples;
+package io.windmill.examples.kvs;
 
 import java.io.IOError;
 import java.io.IOException;
@@ -20,6 +20,21 @@ import io.windmill.net.io.OutputStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
+/**
+ * An example implementation of a persistent key-value store.
+ *
+ * Each cpu is assigned a bucket of keys. For each bucket a commit log
+ * is maintained, as well as an in-memory copy of the current value of
+ * each key (persistence is demonstration-only and commit logs are thrown away
+ * on restart). Access to the store is available via a simple network protocol.
+ * See {@link KVClient} for an example client implementation.
+ *
+ * One CPU is also responsible for listening on, and reading from/writing
+ * to the store's network socket. Requests originate (bytes read/parsed) and
+ * terminate (bytes written) on this CPU but they are processed on the CPU
+ * which the bucket the key belongs to is assigned (using cpu.schedule or
+ * the file operations provided by windmill).
+ */
 public class KVStore
 {
     public static void main(String[] args) throws InterruptedException
@@ -106,11 +121,11 @@ public class KVStore
 
         private Future<FileContext> currentCLContext;
 
-        public Bucket(String commitLongPath, CPU cpu)
+        public Bucket(String commitLogPath, CPU cpu)
         {
             this.cpu = cpu;
             this.store = new HashMap<>();
-            this.commitLog = cpu.open(commitLongPath, "rw");
+            this.commitLog = cpu.open(commitLogPath, "rw");
             this.currentCLContext = commitLog.flatMap((file) -> file.seek(0));
             this.cpu.repeat((CPU bucketCPU, Future prev) -> prev != null && prev.isFailure()
                                         ? prev // returns a failure which stops the loop
@@ -119,10 +134,8 @@ public class KVStore
 
         public Future<ByteBuf> put(Put put)
         {
-            // Re-assigning currentCLContext reference make sure
-            // that all of the the write to the file are linear with
-            // responses, we can safely change ref to currentCLContext since
-            // all routing is done by the thread which server is originally is bind to.
+            // all file operations are performed serially by the cpu this
+            // bucket is running on so re-assignment here is safe
             currentCLContext = put.checkpoint(currentCLContext);
             return currentCLContext.map((context) -> {
                 ByteBuf prev = store.put(put.key, put.value);
