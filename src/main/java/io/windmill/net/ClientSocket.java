@@ -51,6 +51,9 @@ public class ClientSocket extends Future<Channel> implements AutoCloseable
         }
         catch (Exception | Error e)
         {
+            if (channel != null && channel.isConnected())
+                IOUtils.closeQuietly(channel);
+
             setFailure(e);
         }
     }
