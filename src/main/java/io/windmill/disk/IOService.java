@@ -1,6 +1,5 @@
 package io.windmill.disk;
 
-import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,7 +48,7 @@ public class IOService implements AutoCloseable
                     return null;
                 });
             }
-            catch (IOException e)
+            catch (Throwable e)
             {
                 cpu.schedule(() -> {
                     future.setFailure(e);
