@@ -107,8 +107,13 @@ public class Future<O>
 
     public <T> Future<T> flatMap(Task1<O, Future<T>> continuation)
     {
+        return flatMap(cpu, continuation);
+    }
+
+    public <T> Future<T> flatMap(CPU remoteCPU, Task1<O, Future<T>> continuation)
+    {
         Future<T> sink = new Future<>(cpu);
-        map(cpu, (o) -> {
+        map(remoteCPU, (o) -> {
             Future<T> future = continuation.compute(o);
             future.onSuccess(sink::setValue);
             future.onFailure(sink::setFailure);
