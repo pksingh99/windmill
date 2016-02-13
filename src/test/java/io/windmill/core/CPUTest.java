@@ -1,6 +1,5 @@
 package io.windmill.core;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -11,6 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import io.windmill.core.Status.Flag;
 import io.windmill.net.io.InputStream;
 import io.windmill.net.io.OutputStream;
 import io.windmill.utils.Futures;
@@ -28,12 +28,10 @@ public class CPUTest extends AbstractTest
     {
         CountDownLatch latch = new CountDownLatch(10);
 
-        CPUs.get(0).repeat((CPU cpu, Long prev) -> {
+        CPUs.get(0).repeat((cpu) -> {
             try
             {
-                return (prev == null || prev > 0)
-                        ? Futures.constantFuture(cpu, latch.getCount())
-                        : Futures.failedFuture(cpu, null);
+                return Futures.constantFuture(cpu, Status.of(latch.getCount() == 0 ? Flag.STOP : Flag.CONTINUE));
             }
             finally
             {
@@ -52,18 +50,18 @@ public class CPUTest extends AbstractTest
             InputStream input = c.getInput();
             OutputStream output = c.getOutput();
 
-            c.loop((cpu, prev) -> input.read(4)
-                                       .flatMap((header) -> input.read(header.readInt()))
-                                       .map((msg) -> {
-                                           int sum = 0;
-                                           while (msg.readableBytes() > 0)
-                                               sum += msg.readInt();
+            c.loop((cpu) -> input.read(4)
+                                 .flatMap((header) -> input.read(header.readInt()))
+                                 .map((msg) -> {
+                                     int sum = 0;
+                                     while (msg.readableBytes() > 0)
+                                         sum += msg.readInt();
 
-                                           output.writeAndFlush(Unpooled.buffer(12).writeInt(sum))
-                                                 .onSuccess((bytesWritten) -> Assert.assertEquals(4, bytesWritten.intValue()));
+                                     output.writeAndFlush(Unpooled.buffer(12).writeInt(sum))
+                                           .onSuccess((bytesWritten) -> Assert.assertEquals(4, bytesWritten.intValue()));
 
-                                           return null;
-                                       }));
+                                     return null;
+                               }));
         }, Throwable::printStackTrace);
 
 

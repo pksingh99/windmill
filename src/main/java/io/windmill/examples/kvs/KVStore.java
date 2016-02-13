@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 import io.windmill.core.CPU;
 import io.windmill.core.CPUSet;
 import io.windmill.core.Future;
+import io.windmill.core.Status;
+import io.windmill.core.Status.Flag;
 import io.windmill.disk.File;
 import io.windmill.disk.FileContext;
 import io.windmill.net.io.InputStream;
@@ -50,12 +52,12 @@ public class KVStore
             OutputStream out = channel.getOutput();
 
             System.out.println("connected => " + channel);
-            channel.loop((cpu, prev) -> in.read(4)
-                                          .flatMap((header) -> in.read(header.readInt()))
-                                          .flatMap(config::route)
-                                          .map(cpu, (response) -> out.writeInt(response.readableBytes())
-                                                                     .writeBytes(response)
-                                                                     .flush()));
+            channel.loop((cpu) -> in.read(4)
+                                    .flatMap((header) -> in.read(header.readInt()))
+                                    .flatMap(config::route)
+                                    .map(cpu, (response) -> out.writeInt(response.readableBytes())
+                                                               .writeBytes(response)
+                                                               .flush()));
         }, Throwable::printStackTrace);
 
         Thread.currentThread().join();
@@ -127,9 +129,8 @@ public class KVStore
             this.store = new HashMap<>();
             this.commitLog = cpu.open(commitLogPath, "rw");
             this.currentCLContext = commitLog.flatMap((file) -> file.seek(0));
-            this.cpu.repeat((CPU bucketCPU, Future prev) -> prev != null && prev.isFailure()
-                                        ? prev // returns a failure which stops the loop
-                                        : cpu.sleep(1, TimeUnit.SECONDS, () -> commitLog.map(File::sync)));
+            this.cpu.repeat((bucketCPU) -> cpu.sleep(1, TimeUnit.SECONDS, () -> commitLog.map(File::sync))
+                                                           .map((numFlushed) -> Status.of(Flag.CONTINUE)));
         }
 
         public Future<ByteBuf> put(Put put)

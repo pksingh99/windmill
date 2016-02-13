@@ -163,7 +163,7 @@ public class FileTest
 
             CPU.listen(new InetSocketAddress("127.0.0.1", 31338), (c) -> {
                 InputStream in = c.getInput();
-                c.loop((cpu, prev) -> in.read(8).map((header) -> file.transferTo(c, header.readInt(), header.readInt())));
+                c.loop((cpu) -> in.read(8).map((header) -> file.transferTo(c, header.readInt(), header.readInt())));
             }, Throwable::printStackTrace);
 
             Future<Channel> client = CPU.connect(new InetSocketAddress("127.0.0.1", 31338));
@@ -175,7 +175,7 @@ public class FileTest
                 InputStream in = channel.getInput();
                 OutputStream out = channel.getOutput();
 
-                channel.loop((cpu, prev) -> {
+                channel.loop((cpu) -> {
                     if (latch.getCount() == 0) // done
                         return Futures.failedFuture(cpu, null);
 

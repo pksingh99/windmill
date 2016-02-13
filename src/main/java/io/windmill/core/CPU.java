@@ -9,10 +9,8 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.windmill.core.tasks.Task0;
-import io.windmill.core.tasks.Task2;
-import io.windmill.core.tasks.VoidTask0;
-import io.windmill.core.tasks.VoidTask1;
+import io.windmill.core.tasks.*;
+import io.windmill.core.Status.Flag;
 import io.windmill.disk.File;
 import io.windmill.disk.IOService;
 import io.windmill.disk.IOTask;
@@ -103,14 +101,12 @@ public class CPU
         return io.schedule(task);
     }
 
-    public <O> void repeat(Task2<CPU, O, Future<O>> task)
+    public <O> void repeat(Task1<CPU, Future<Status<O>>> task)
     {
-        repeat(task, null);
-    }
-
-    private <O> void repeat(Task2<CPU, O, Future<O>> task, O prev)
-    {
-        schedule(() -> task.compute(this, prev).onSuccess((v) -> repeat(task, v)));
+        schedule(() -> task.compute(this).onSuccess((status) -> {
+           if (status.flag == Flag.CONTINUE)
+               repeat(task);
+        }));
     }
 
     public <I> Future<List<I>> sequence(List<Future<I>> futures)

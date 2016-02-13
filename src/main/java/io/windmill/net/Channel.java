@@ -7,7 +7,9 @@ import java.nio.channels.SocketChannel;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
-import io.windmill.core.tasks.Task2;
+import io.windmill.core.Status;
+import io.windmill.core.Status.Flag;
+import io.windmill.core.tasks.Task1;
 import io.windmill.net.io.InputStream;
 import io.windmill.net.io.OutputStream;
 import io.windmill.utils.IOUtils;
@@ -32,9 +34,9 @@ public class Channel implements AutoCloseable
         this.output = new OutputStream(cpu, key, channel);
     }
 
-    public <O> void loop(Task2<CPU, O, Future<O>> task)
+    public <O> void loop(Task1<CPU, Future<O>> task)
     {
-        cpu.repeat(task::compute);
+        cpu.repeat((cpu) -> task.compute(cpu).map((v) -> Status.of(Flag.CONTINUE)));
     }
 
     public InputStream getInput()
