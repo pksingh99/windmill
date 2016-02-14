@@ -16,7 +16,17 @@ public class Status<T>
         this.value = value;
     }
 
-    public static Status<Void> of(Flag flag)
+    public Flag getFlag()
+    {
+        return flag;
+    }
+
+    public T getValue()
+    {
+        return value;
+    }
+
+    public static <T> Status<T> of(Flag flag)
     {
         return new Status<>(flag, null);
     }

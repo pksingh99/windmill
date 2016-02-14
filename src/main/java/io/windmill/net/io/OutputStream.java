@@ -36,6 +36,11 @@ public class OutputStream implements AutoCloseable
         return this;
     }
 
+    public OutputStream writeBytes(byte[] bytes)
+    {
+        return writeBytes(Unpooled.wrappedBuffer(bytes));
+    }
+
     public OutputStream writeBytes(ByteBuf bytes)
     {
         txQueue.add(new TxTask(bytes, Optional.empty()));

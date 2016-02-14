@@ -1,5 +1,7 @@
 package io.windmill.core;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -11,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.windmill.core.Status.Flag;
+import io.windmill.core.tasks.Task1;
 import io.windmill.net.io.InputStream;
 import io.windmill.net.io.OutputStream;
 import io.windmill.utils.Futures;
@@ -19,6 +22,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class CPUTest extends AbstractTest
@@ -45,7 +49,6 @@ public class CPUTest extends AbstractTest
     @Test
     public void testListen() throws Exception
     {
-        // non-blocking server which takes frame consisting
         CPUs.get(0).listen(new InetSocketAddress("localhost", 31337), (c) -> {
             InputStream input = c.getInput();
             OutputStream output = c.getOutput();
@@ -79,6 +82,81 @@ public class CPUTest extends AbstractTest
 
                 Assert.assertEquals(4, in.read(response));
                 Assert.assertEquals(3 * i + 3, Unpooled.wrappedBuffer(response).readInt());
+            }
+        }
+    }
+
+    @Test
+    public void testListenWithConsumer() throws Exception
+    {
+        CPUs.get(0).listen(new InetSocketAddress("localhost", 31339), (channel) -> {
+            InputStream input = channel.getInput();
+            OutputStream output = channel.getOutput();
+
+            Task1<ByteBuf, Status<byte[]>> consumer = (buffer) -> {
+                if (buffer.readableBytes() < 4)
+                    return Status.of(Flag.CONTINUE);
+
+                buffer.markReaderIndex();
+
+                int length = buffer.readInt();
+                if (buffer.readableBytes() < length)
+                {
+                    buffer.resetReaderIndex();
+                    return Status.of(Flag.CONTINUE);
+                }
+
+                byte[] payload = new byte[length];
+                buffer.readBytes(payload);
+
+                return Status.of(Flag.STOP, payload);
+            };
+
+            channel.loop((cpu) -> input.read(consumer)
+                                       .flatMap((payload) -> output.writeInt(payload.length)
+                                                                   .writeBytes(payload)
+                                                                   .flush()));
+        }, Throwable::printStackTrace);
+
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        try (Socket client = new Socket("localhost", 31339))
+        {
+            DataInputStream input = new DataInputStream(client.getInputStream());
+            DataOutputStream output = new DataOutputStream(client.getOutputStream());
+
+            for (int i = 0; i < 20; i++)
+            {
+                int length = random.nextInt(1, 1024);
+                byte[] request = new byte[length];
+                random.nextBytes(request);
+
+                output.writeInt(length);
+                output.flush(); // flush right after size to trigger CONTINUE behavior of the consumer
+
+                for (int j = 0; j < request.length; j++)
+                {
+                    output.writeByte(request[j]);
+
+                    // let's do random flushes and slow down client to trigger random
+                    // behavior on the server consumer side
+                    if (j % random.nextInt(3, 10) == 0)
+                    {
+                        Futures.sleepUninterruptibly(100, TimeUnit.MICROSECONDS);
+                        output.flush();
+                    }
+                }
+
+                output.flush();
+
+                int responseLength = input.readInt();
+                byte[] response = new byte[responseLength];
+
+                int read = input.read(response);
+
+                Assert.assertEquals(responseLength, read);
+                Assert.assertEquals(length, responseLength);
+                Assert.assertArrayEquals(request, response);
             }
         }
     }

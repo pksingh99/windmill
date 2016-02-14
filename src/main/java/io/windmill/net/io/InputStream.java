@@ -10,6 +10,9 @@ import java.util.Queue;
 
 import io.windmill.core.CPU;
 import io.windmill.core.Future;
+import io.windmill.core.Status;
+import io.windmill.core.Status.Flag;
+import io.windmill.core.tasks.Task1;
 import io.windmill.net.TransferTask;
 import io.windmill.utils.Futures;
 
@@ -33,6 +36,13 @@ public class InputStream implements AutoCloseable
         this.rxQueue = new RxQueue(channel.socket().getReceiveBufferSize());
     }
 
+    /**
+     * Read requested exact number of bytes from the channel.
+     *
+     * @param size The number of bytes to read.
+     *
+     * @return The promise of ByteBuf containing N requested bytes.
+     */
     public Future<ByteBuf> read(int size)
     {
         if (!channel.isOpen())
@@ -52,6 +62,64 @@ public class InputStream implements AutoCloseable
         }
 
         return ioPromise;
+    }
+
+    /**
+     * Given the function incrementally (based on Status) read up to
+     * required number of bytes from the channel, and return output of type T.
+     *
+     * NOTE: bytes which have been provided but haven't been consumed by the function,
+     * are going to be automatically returned back to the channel queue.
+     *
+     * @param consumer The function to incrementally read data from the channel and produce output.
+     * @param <T> The type of the output.
+     *
+     * @return The output promise.
+     */
+    public <T> Future<T> read(Task1<ByteBuf, Status<T>> consumer)
+    {
+        if (!channel.isOpen())
+            return Futures.failedFuture(cpu, new ClosedChannelException());
+
+        Future<T> promise = new Future<>(cpu);
+        CompositeByteBuf sink = Unpooled.compositeBuffer();
+
+        RxTask consumerTask = new RxTask(null, 0)
+        {
+            @Override
+            public boolean compute(RxQueue rx)
+            {
+                int availableBytes = rx.availableBytes();
+                if (availableBytes <= 0)
+                    return false;
+
+                ByteBuf freshBytes = rx.transfer(availableBytes);
+
+                sink.addComponent(freshBytes);
+                sink.writerIndex(sink.writerIndex() + freshBytes.readableBytes());
+
+                Status<T> status = consumer.compute(sink);
+                if (status.getFlag() == Flag.CONTINUE)
+                    return false;
+
+                int leftOverBytes = sink.readableBytes();
+                if (leftOverBytes > 0)
+                    rx.rx(sink.readBytes(leftOverBytes));
+
+                promise.setValue(status.getValue());
+                return true;
+            }
+        };
+
+        // nothing else is pending and we have some bytes available, let's try to read inline
+        if (pendingTasks.size() == 0 && rxQueue.availableBytes() > 0)
+        {
+            if (consumerTask.compute(rxQueue))
+                return promise;
+        }
+
+        pendingTasks.add(consumerTask);
+        return promise;
     }
 
     public void triggerRx() throws IOException
@@ -90,7 +158,7 @@ public class InputStream implements AutoCloseable
 
         public RxTask(Future<ByteBuf> request, int size)
         {
-            super(null, Optional.of(request));
+            super(null, Optional.ofNullable(request));
             this.size = size;
         }
 
@@ -128,7 +196,7 @@ public class InputStream implements AutoCloseable
         public void rx(SocketChannel channel) throws IOException
         {
             // queue is full (read up to RX buffer size)
-            if (availableBytes == maxSize)
+            if (availableBytes >= maxSize)
                 return;
 
             // first let's try to re-use already existing top "in-progress" buffer
@@ -152,8 +220,20 @@ public class InputStream implements AutoCloseable
             rx.add(component);
         }
 
+        public void rx(ByteBuf buffer)
+        {
+            if (buffer.readableBytes() == 0)
+                return;
+
+            rx.add(buffer);
+            availableBytes += buffer.readableBytes();
+        }
+
         public ByteBuf transfer(int size)
         {
+            if (size == -1)
+                return null;
+
             CompositeByteBuf buffer = null;
 
             while (!rx.isEmpty())

@@ -28,7 +28,8 @@ public abstract class TransferTask<I, O> implements AutoCloseable
     @Override
     public void close()
     {
-        buffer.release();
+        if (buffer != null)
+            buffer.release();
         onComplete.ifPresent((f) -> f.setFailure(new ClosedChannelException()));
     }
 }
