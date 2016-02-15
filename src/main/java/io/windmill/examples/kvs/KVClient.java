@@ -96,7 +96,7 @@ public class KVClient
                 OutputStream out = channel.getOutput();
                 out.writeInt(buf.readableBytes()).writeAndFlush(buf);
                 return channel.getInput();
-            }).flatMap(input -> input.read(4).flatMap(header -> input.read(header.readInt())));
+            }).flatMap(input -> input.readInt().flatMap(input::read));
         }
     }
 }

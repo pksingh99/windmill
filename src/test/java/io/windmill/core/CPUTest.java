@@ -52,8 +52,8 @@ public class CPUTest extends AbstractTest
             InputStream input = c.getInput();
             OutputStream output = c.getOutput();
 
-            c.loop((cpu) -> input.read(4)
-                                 .flatMap((header) -> input.read(header.readInt()))
+            c.loop((cpu) -> input.readInt()
+                                 .flatMap(input::read)
                                  .map((msg) -> {
                                      int sum = 0;
                                      while (msg.readableBytes() > 0)

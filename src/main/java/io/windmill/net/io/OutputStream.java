@@ -30,12 +30,78 @@ public class OutputStream implements AutoCloseable
         this.txQueue = new ArrayDeque<>();
     }
 
+    /**
+     * Write {@link Short#BYTES} bytes to the stream representing encoded short value.
+     *
+     * @param v The short value to write to the stream.
+     *
+     * @return current output stream.
+     */
+    public OutputStream writeShort(short v)
+    {
+        writeBytes(Unpooled.copyShort(v));
+        return this;
+    }
+
+    /**
+     * Write {@link Integer#BYTES} bytes to the stream representing encoded integer value.
+     *
+     * @param v The integer value to write to the stream.
+     *
+     * @return current output stream.
+     */
     public OutputStream writeInt(int v)
     {
         writeBytes(Unpooled.copyInt(v));
         return this;
     }
 
+    /**
+     * Write {@link Float#BYTES} bytes to the stream representing encoded float value.
+     *
+     * @param v The float value to write to the stream.
+     *
+     * @return current output stream.
+     */
+    public OutputStream writeFloat(float v)
+    {
+        writeBytes(Unpooled.copyFloat(v));
+        return this;
+    }
+
+    /**
+     * Write {@link Long#BYTES} bytes to the stream representing encoded long value.
+     *
+     * @param v The long value to write to the stream.
+     *
+     * @return current output stream.
+     */
+    public OutputStream writeLong(long v)
+    {
+        writeBytes(Unpooled.copyLong(v));
+        return this;
+    }
+
+    /**
+     * Write {@link Double#BYTES} bytes to the stream representing encoded double value.
+     *
+     * @param v The double value to write to the stream.
+     *
+     * @return current output stream.
+     */
+    public OutputStream writeDouble(double v)
+    {
+        writeBytes(Unpooled.copyDouble(v));
+        return this;
+    }
+
+    /**
+     * Write arbitrary sized array of bytes to the stream.
+     *
+     * @param bytes The bytes to write to the stream.
+     *
+     * @return current output stream.
+     */
     public OutputStream writeBytes(byte[] bytes)
     {
         return writeBytes(Unpooled.wrappedBuffer(bytes));

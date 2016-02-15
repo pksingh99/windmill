@@ -52,8 +52,8 @@ public class KVStore
             OutputStream out = channel.getOutput();
 
             System.out.println("connected => " + channel);
-            channel.loop((cpu) -> in.read(4)
-                                    .flatMap((header) -> in.read(header.readInt()))
+            channel.loop((cpu) -> in.readInt()
+                                    .flatMap(in::read)
                                     .flatMap(config::route)
                                     .map(cpu, (response) -> out.writeInt(response.readableBytes())
                                                                .writeBytes(response)

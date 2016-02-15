@@ -37,6 +37,65 @@ public class InputStream implements AutoCloseable
     }
 
     /**
+     * @return read and return byte from the stream, this is
+     *         equivalent to reading 1 byte from the stream.
+     */
+    public Future<Byte> readByte()
+    {
+        return read(1).map(ByteBuf::readByte);
+    }
+
+    /**
+     * @return read and return short from the stream, this is
+     *         equivalent to reading {@link Short#BYTES} bytes from the stream and decoding them
+     *         as a short.
+     */
+    public Future<Short> readShort()
+    {
+        return read(Short.BYTES).map(ByteBuf::readShort);
+    }
+
+    /**
+     * @return read and return integer from the stream, this is
+     *         equivalent to reading {@link Integer#BYTES} bytes from the stream and decoding them
+     *         as an integer.
+     */
+    public Future<Integer> readInt()
+    {
+        return read(Integer.BYTES).map(ByteBuf::readInt);
+    }
+
+    /**
+     * @return read and return float from the stream, this is
+     *         equivalent to reading {@link Float#BYTES} bytes from the stream and decoding them
+     *         as a float.
+     */
+    public Future<Float> readFloat()
+    {
+        return read(Float.BYTES).map(ByteBuf::readFloat);
+    }
+
+    /**
+     * @return read and return long from the stream, this is
+     *         equivalent to reading {@link Long#BYTES} bytes from the stream and decoding them
+     *         as a long.
+     */
+    public Future<Long> readLong()
+    {
+        return read(Long.BYTES).map(ByteBuf::readLong);
+    }
+
+    /**
+     * @return read and return double from the stream, this is
+     *         equivalent to reading {@link Double#BYTES} bytes from the stream and decoding them
+     *         as a double.
+     */
+    public Future<Double> readDouble()
+    {
+        return read(Double.BYTES).map(ByteBuf::readDouble);
+    }
+
+    /**
      * Read requested exact number of bytes from the channel.
      *
      * @param size The number of bytes to read.
