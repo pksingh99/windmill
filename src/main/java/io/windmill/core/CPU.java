@@ -38,7 +38,7 @@ public class CPU
     private static final Logger logger = LoggerFactory.getLogger(CPU.class);
 
     // default number of I/O threads per CPU
-    private static final int DEFAULT_IO_THREADS = 4;
+    private static final int DEFAULT_IO_THREADS = Integer.getInteger("windmill.cpu.io_threads", 4);
 
     private static final EventPoller.Handler<WorkEvent> HANDLER = (event, sequence, endOfBatch) -> {
         event.run();
