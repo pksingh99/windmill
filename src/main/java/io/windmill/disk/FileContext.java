@@ -13,7 +13,6 @@ import io.netty.buffer.Unpooled;
 
 public class FileContext
 {
-
     private final File file;
     private long position;
 

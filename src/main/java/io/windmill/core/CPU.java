@@ -101,11 +101,21 @@ public class CPU
         return io.schedule(task);
     }
 
-    public <O> void repeat(Task1<CPU, Future<Status<O>>> task)
+    public void repeat(Task1<CPU, Future<Status<Void>>> task)
     {
-        schedule(() -> task.compute(this).onSuccess((status) -> {
-           if (status.flag == Flag.CONTINUE)
-               repeat(task);
+        repeat((Task2<CPU, Void, Future<Status<Void>>>) (cpu, previous) -> task.compute(cpu));
+    }
+
+    public <O> void repeat(Task2<CPU, O, Future<Status<O>>> task)
+    {
+        repeat(task, null);
+    }
+
+    private <O> void repeat(Task2<CPU, O, Future<Status<O>>> task, O previous)
+    {
+        schedule(() -> task.compute(this, previous).onSuccess((status) -> {
+            if (status.flag == Flag.CONTINUE)
+                repeat(task, status.value);
         }));
     }
 
