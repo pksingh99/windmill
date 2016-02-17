@@ -1,5 +1,7 @@
 # Windmill
 
+[![Build Status](https://travis-ci.org/xedin/windmill.svg?branch=master)](https://travis-ci.org/xedin/windmill)
+
 Windmill is a Java 8 library for building high-performance applications
 using the "Thread-per-Core" or "Shared-Nothing" architecture.
 
