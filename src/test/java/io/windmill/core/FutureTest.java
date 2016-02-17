@@ -377,7 +377,7 @@ public class FutureTest extends AbstractTest
         Future<Integer> c = b.map(cpuB, (v) -> 1);
 
         b.onComplete(latchA::countDown);
-        b.onComplete(latchA::countDown);
+        c.onComplete(latchA::countDown);
 
         Futures.awaitUninterruptibly(latchA);
 
