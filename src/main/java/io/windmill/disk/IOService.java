@@ -90,8 +90,7 @@ public class IOService implements AutoCloseable
         public Thread newThread(Runnable task)
         {
             Thread newThread = new Thread(() -> {
-                if (cpu.getLayout() != null)
-                    AffinitySupport.setAffinity(1L << cpu.getId());
+                cpu.setAffinity();
 
                 task.run();
             }, cpu.getId() + "-io:" + threadId.incrementAndGet());

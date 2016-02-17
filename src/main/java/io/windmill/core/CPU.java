@@ -321,8 +321,7 @@ public class CPU
 
     protected void run()
     {
-        if (layout != null)
-            AffinitySupport.setAffinity(1L << id);
+        setAffinity();
 
         EventPoller<WorkEvent> poller = runQueue.newPoller();
 
@@ -364,6 +363,19 @@ public class CPU
     public void halt()
     {
         isHalted = true;
+    }
+
+    public void setAffinity()
+    {
+        try
+        {
+            if (layout == null)
+                AffinitySupport.setAffinity(1L << id);
+        }
+        catch (IllegalStateException e)
+        {
+            logger.warn("failed to set affinity for CPU {}, ignoring...", id, e);
+        }
     }
 
     private class WorkEvent implements Runnable
