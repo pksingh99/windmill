@@ -369,7 +369,7 @@ public class CPU
     {
         try
         {
-            if (layout == null)
+            if (layout != null)
                 AffinitySupport.setAffinity(1L << id);
         }
         catch (IllegalStateException e)
