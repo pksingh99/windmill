@@ -108,10 +108,11 @@ public class CPUSet
         {
             if (layout != null)
             {
-                if (layout.sockets() < socketId + 1)
+                if (layout.sockets() < socketId)
                     throw new IllegalArgumentException(String.format("Insufficient CPU sockets, total %d, tried to add one more.", layout.sockets()));
 
-                if (layout.coresPerSocket() < cpuIds.length)
+                int maxCoresPerSocket = layout.coresPerSocket();
+                if (maxCoresPerSocket > 0 && maxCoresPerSocket < cpuIds.length)
                     throw new IllegalArgumentException(String.format("Insufficient CPU cores per socket, total %d, tried to allocate %d.", layout.coresPerSocket(), cpuIds.length));
             }
 

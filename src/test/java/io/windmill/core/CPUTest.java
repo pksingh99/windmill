@@ -58,12 +58,8 @@ public class CPUTest extends AbstractTest
                                      int sum = 0;
                                      while (msg.readableBytes() > 0)
                                          sum += msg.readInt();
-
-                                     output.writeAndFlush(Unpooled.buffer(12).writeInt(sum))
-                                           .onSuccess((bytesWritten) -> Assert.assertEquals(4, bytesWritten.intValue()));
-
-                                     return null;
-                               }));
+                                     return output.writeInt(sum).flush();
+                                 }));
         }, Throwable::printStackTrace);
 
 
