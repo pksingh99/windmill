@@ -69,8 +69,8 @@ public class FileTest
         AtomicReference<IOException> exception = new AtomicReference<>();
         Future<File> fileFuture = CPU.open("/tmp/non-existent-akane", "r");
         fileFuture.onFailure((e) -> {
-            latch.countDown();
             exception.set((IOException) e);
+            latch.countDown();
         });
 
         Futures.awaitUninterruptibly(latch, 1, TimeUnit.SECONDS);
