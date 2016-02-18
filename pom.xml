@@ -24,7 +24,7 @@
     </build>
     <packaging>pom</packaging>
 
-    <name>windmill parent</name>
+    <name>Windmill</name>
     <url>http://github.com/xedin/windmill</url>
 
     <properties>

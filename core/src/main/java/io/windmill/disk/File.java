@@ -107,7 +107,7 @@ public class File
      */
     protected final void evictPage(int pageOffset)
     {
-        cache.evictPage(pageOffset);
+        cpu.schedule(() -> cache.evictPage(pageOffset));
     }
 
     /**

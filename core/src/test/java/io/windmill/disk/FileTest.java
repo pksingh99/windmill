@@ -261,9 +261,6 @@ public class FileTest
         Futures.await(file.close());
 
         Assert.assertEquals(0, pageTracker.estimatedSize());
-        pageConsumer = new CountingPageConsumer();
-        file.cache.forEach(pageConsumer);
-        Assert.assertEquals(0, pageConsumer.getCount());
     }
 
     private byte[] getInt(int n)

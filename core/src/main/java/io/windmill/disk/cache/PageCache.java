@@ -285,13 +285,13 @@ public class PageCache
         // and once it is complete (success or failure)
         // we'll close the file.
         sync().onComplete(() -> {
+            if (pageConsumer != null)
+                forEach(pageConsumer::accept);
+
             Future<Void> close = cpu.scheduleIO(() -> {
                 file.close();
                 return null;
             });
-
-            if (pageConsumer != null)
-                forEach(pageConsumer::accept);
 
             close.onSuccess(closePromise::setValue);
             close.onFailure(closePromise::setFailure);
