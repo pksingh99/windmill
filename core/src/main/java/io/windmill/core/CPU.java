@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * All work in windmill is scheduled on a {@link CPU}, using any of the
  * functions defined on it, such as {@link #schedule(Task0)}, {@link #open(java.io.File, String)},
  * {@link #connect(InetSocketAddress)}, {@link #listen(InetSocketAddress, VoidTask1, VoidTask1)},
- * or {@link #repeat(Task1)} functions, or by performing operations on the {@link Future<0>}s
+ * or {@link #repeat(Task1)} functions, or by performing operations on the {@link Future}s
  * returned by these operations.
  *
  * The number of IO threads used by each windmill CPU is configurable via the
@@ -112,8 +112,8 @@ public class CPU
      * Try to make a connection to the given {@link InetSocketAddress}.
      *
      * @param address the address to connect to
-     * @return a {@link Future<Channel>} that represents the eventual connection or failure,
-     * the {@link Channel} object can be used to perform further operations on the conncetion.
+     * @return a {@link Future} that represents the eventual connection or failure,
+     * the {@link Channel} object can be used to perform further operations on the connection.
      */
     public Future<Channel> connect(InetSocketAddress address)
     {
@@ -124,7 +124,7 @@ public class CPU
      * Schedule arbitrary work, which does not return a value, on this CPU
      *
      * @param task the work to execute
-     * @return a {@link Future<Void>} that can be used to interact with the completion of the work or
+     * @return a {@link Future} that can be used to interact with the completion of the work or
      * any exceptions that occur during its execution.
      */
     public Future<Void> schedule(VoidTask0 task)
@@ -137,7 +137,7 @@ public class CPU
      *
      * @param task the work to execute
      * @param <O> the type of value the work returns
-     * @return a {@link Future<O>} that can be used to schedule more work based on the result, or to handle
+     * @return a {@link Future} that can be used to schedule more work based on the result, or to handle
      * any exceptions that occurred during execution.
      */
     public <O> Future<O> schedule(Task0<O> task)
@@ -151,7 +151,7 @@ public class CPU
      *
      * @param task the work to execute
      * @param <O> the type of value the work returns
-     * @return a {@link Future<O>} that can be used to schedule more work based on the result, or to handle
+     * @return a {@link Future} that can be used to schedule more work based on the result, or to handle
      * any exceptions that occurred during execution.
      */
     public <O> Future<O> scheduleIO(IOTask<O> task)
@@ -172,7 +172,7 @@ public class CPU
 
     /**
      * Perform a task continuously - executing the next iteration once the previous has completed. Tasks
-     * can indicate whether or not to continue, and propogate the previous result, via the {@link Status<O>} in the returned future.
+     * can indicate whether or not to continue, and propagate the previous result, via the {@link Status} in the returned future.
      *
      * @param task the work to perform repeatedly
      * @param <O> the type of value the work produces
@@ -192,12 +192,12 @@ public class CPU
 
     /**
      * Given a list of asynchronous work, all returning the same type of value, {@code I},
-     * return a single {@link Future<I>} representing the successful completion of all of
+     * return a single {@link Future} representing the successful completion of all of
      * the work, or one or more failures
      *
      * @param futures the list of work to sequence
      * @param <I> the type of value returned by every task in the list
-     * @return a {@link Future<I>} representing the successful completion of all of
+     * @return a {@link Future} representing the successful completion of all of
      * the work, or one or more failures
      */
     public <I> Future<List<I>> sequence(List<Future<I>> futures)
@@ -242,7 +242,7 @@ public class CPU
      * @param unit the unit of {@code duration}
      * @param then the work to execute after the given delay
      * @param <O> the type of value the work returns
-     * @return a {@link Future<O>} allow work to be scheduled based on the result
+     * @return a {@link Future} allow work to be scheduled based on the result
      * of the work executing after the given delay
      */
     public <O> Future<O> sleep(long duration, TimeUnit unit, Task0<O> then)
@@ -257,7 +257,7 @@ public class CPU
      *
      * @param path the absolute or relative path to the file
      * @param mode see {@link java.io.RandomAccessFile} for a description of this argument
-     * @return a {@link Future<File>} that can be used to perform operations on the file,
+     * @return a {@link Future} that can be used to perform operations on the file,
      * if successfully opened, or handle any exceptions that may have occurred
      */
     public Future<File> open(String path, String mode)
@@ -270,7 +270,7 @@ public class CPU
      *
      * @param file the file to open
      * @param mode see {@link java.io.RandomAccessFile} for a description of this argument
-     * @return a {@link Future<File>} that can be used to perform operations on the file,
+     * @return a {@link Future} that can be used to perform operations on the file,
      * if successfully opened, or handle any exceptions that may have occurred
      */
     public Future<File> open(java.io.File file, String mode)

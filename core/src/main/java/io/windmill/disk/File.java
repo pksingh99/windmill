@@ -114,7 +114,7 @@ public class File
      * Make a copy of the current file instance and set position to specified one,
      * allows for chaining of the reads and writes without affecting global context e.g.
      *
-     * file.seek(pos).flatMap((context) -> context.read(n).flatMap((bytes) -> ...).
+     * file.seek(pos).flatMap((context) -&gt; context.read(n).flatMap((bytes) -&gt; ...).
      *
      * @param newPosition The position to set to the file.
      *

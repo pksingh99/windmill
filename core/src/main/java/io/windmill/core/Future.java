@@ -10,10 +10,10 @@ import io.windmill.core.tasks.VoidTask1;
 /**
  * A container for asynchronous work that may have completed or will
  * complete at a later time either by producing a value or by ending in an
- * exception, similar to {@link java.util.concurrent.Future<O>} and
- * implementations in other languages or libraries. Windmill {@link Future<O>}s
+ * exception, similar to {@link java.util.concurrent.Future} and
+ * implementations in other languages or libraries. Windmill {@link Future}s
  * run on a specific {@link CPU} and operations to schedule work based on the
- * result of one {@link Future<O>} can be scheduled on the same or a different
+ * result of one {@link Future} can be scheduled on the same or a different
  * {@link CPU}.
  *
  * @param <O> the type of value the work produces
@@ -61,7 +61,6 @@ public class Future<O>
     }
 
     /**
-     *
      * @return true when the work ended in exception
      */
     public boolean isFailure()
@@ -80,8 +79,8 @@ public class Future<O>
     /**
      * Sets the result value of this {@link Future} and sets the state to {@code SUCCESS}
      *
-     * @throws IllegalStateException if either {@link #setValue(Object)} or {@link #setFailure(Throwable)} has been called
      * @param newValue the result of the work performed
+     * @throws IllegalStateException if either {@link #setValue(Object)} or {@link #setFailure(Throwable)} has been called
      */
     public void setValue(O newValue)
     {
@@ -100,7 +99,7 @@ public class Future<O>
     }
 
     /**
-     * Sets the result of this {@link Future<O>} to the given {@link Throwable} and
+     * Sets the result of this {@link Future} to the given {@link Throwable} and
      * sets the state to {@code FAILURE}.
      *
      * @throws IllegalStateException if either {@link #setValue(Object)} or {@link #setFailure(Throwable)} has been called
@@ -124,12 +123,12 @@ public class Future<O>
     }
 
     /**
-     * Transform the value produced by this {@link Future<O>}. The transformation is applied
-     * on the CPU that the work this {@link Future<O>} represents is running on.
+     * Transform the value produced by this {@link Future}. The transformation is applied
+     * on the CPU that the work this {@link Future} represents is running on.
      *
-     * @param continuation the function to apply to the result of this {@link Future<O>}
+     * @param continuation the function to apply to the result of this {@link Future}
      * @param <T> the type of value returned by the function
-     * @return a {@link Future<T>} whose result, when available, will reflect the applied transformation
+     * @return a {@link Future} whose result, when available, will reflect the applied transformation
      */
     public <T> Future<T> map(Task1<O, T> continuation)
     {
@@ -137,14 +136,14 @@ public class Future<O>
     }
 
     /**
-     * Transform the value produced by this {@link Future<O>}, performing the work
-     * on the given {@link CPU}, instead of the {@link CPU} this {@link Future<O>}'s work
+     * Transform the value produced by this {@link Future}, performing the work
+     * on the given {@link CPU}, instead of the {@link CPU} this {@link Future}'s work
      * is executing on
      *
      * @param remoteCPU the {@link CPU} to apply the transformation on
      * @param continuation the transformation to apply
      * @param <T> the type of value produced by the transformation
-     * @return a {@link Future<T>} whose result, when available, will reflect the applied transformation
+     * @return a {@link Future} whose result, when available, will reflect the applied transformation
      */
     public <T> Future<T> map(CPU remoteCPU, Task1<O, T> continuation)
     {
@@ -160,12 +159,12 @@ public class Future<O>
 
     /**
      * Perform another asynchronous body of work based on the result of this
-     * {@link Future<O>}'s work. The work will be performed on the same {@link CPU}
-     * as this {@link Future<O>}'s.
+     * {@link Future}'s work. The work will be performed on the same {@link CPU}
+     * as this {@link Future}'s.
      *
      * @param continuation the work to perform
      * @param <T> the type of value returned by the work
-     * @return a {@link Future<T>} that can be used to operate on the final result
+     * @return a {@link Future} that can be used to operate on the final result
      */
     public <T> Future<T> flatMap(Task1<O, Future<T>> continuation)
     {
@@ -174,14 +173,14 @@ public class Future<O>
 
     /**
      * Perform another asynchronous body of work based on the result of this
-     * {@link Future<O>}'s work. The work will be performed on the given {@link CPU}
+     * {@link Future}'s work. The work will be performed on the given {@link CPU}
      * instead of on the same {@link CPU} that is running the work represented by this
-     * {@link Future<O>}.
+     * {@link Future}.
      *
      * @param remoteCPU the {@link CPU} to perform the work on
      * @param continuation the work to perform
      * @param <T> the type of value produced by the work
-     * @return a {@link Future<T>} that can be used to operate on the final result
+     * @return a {@link Future} that can be used to operate on the final result
      */
     public <T> Future<T> flatMap(CPU remoteCPU, Task1<O, Future<T>> continuation)
     {
@@ -196,8 +195,8 @@ public class Future<O>
     }
 
     /**
-     * Execute work when this {@link Future<O>}'s work completes successfully. The work
-     * produces no value and is executed on the same {@link CPU} as this {@link Future<O>}'s
+     * Execute work when this {@link Future}'s work completes successfully. The work
+     * produces no value and is executed on the same {@link CPU} as this {@link Future}'s
      * work.
      * @param then the work to execute
      */
@@ -207,9 +206,9 @@ public class Future<O>
     }
 
     /**
-     * Execute work when this {@link Future<O>}'s work completes successfully. The work
+     * Execute work when this {@link Future}'s work completes successfully. The work
      * produces no value and is executed on the given {@link CPU} instead of on the {@link CPU}
-     * this {@link Future<O>}'s work is being executed on.
+     * this {@link Future}'s work is being executed on.
      * @param remoteCPU the {@link CPU} to perform the work on
      * @param then the work to perform
      */
@@ -219,8 +218,8 @@ public class Future<O>
     }
 
     /**
-     * Execute work when this {@link Future<O>}'s work ends in an exception. The work
-     * produces no value and is executed on the same {@link CPU} as this {@link Future<O>}'s
+     * Execute work when this {@link Future}'s work ends in an exception. The work
+     * produces no value and is executed on the same {@link CPU} as this {@link Future}'s
      * work.
      * @param continuation the work to execute
      */

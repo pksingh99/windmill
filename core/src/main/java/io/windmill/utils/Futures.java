@@ -67,6 +67,8 @@ public class Futures
 
     /**
      * Invokes {@code latch.}{@link CountDownLatch#await() await()} uninterruptibly.
+     *
+     * @param latch The latch to wait on
      */
     public static void awaitUninterruptibly(CountDownLatch latch)
     {
@@ -95,6 +97,12 @@ public class Futures
 
     /**
      * Invokes {@code latch.}{@link CountDownLatch#await(long, TimeUnit) await(timeout, unit)} uninterruptibly.
+     *
+     * @param latch The latch to wait on
+     * @param timeout The amount of time to wait on the given latch
+     * @param unit The time unit of the timeout
+     *
+     * @return true if latch waiting completed successfully, false otherwise.
      */
     public static boolean awaitUninterruptibly(CountDownLatch latch, long timeout, TimeUnit unit)
     {
@@ -127,6 +135,9 @@ public class Futures
 
     /**
      * Invokes {@code unit.}{@link TimeUnit#sleep(long) sleep(sleepFor)} uninterruptibly.
+     *
+     * @param sleepFor The amount of type to sleep
+     * @param unit The time unit of the sleep duration
      */
     public static void sleepUninterruptibly(long sleepFor, TimeUnit unit)
     {

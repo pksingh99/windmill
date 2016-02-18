@@ -6,9 +6,9 @@ public interface Task2<I1, I2, O>
     O compute(I1 i1, I2 i2);
 
     /**
-     * Returns a task in curried form.
-     *
      * @see <a href="https://en.wikipedia.org/wiki/Currying">Currying</a>
+     *
+     * @return current task in the curried form
      */
     default Task1<I1, Task1<I2, O>> curried()
     {
@@ -16,7 +16,7 @@ public interface Task2<I1, I2, O>
     }
 
     /**
-     * Creates a new task that reverses the input order
+     * @return a new task that reverses the input order
      */
     default Task2<I2, I1, O> flip()
     {
@@ -25,6 +25,10 @@ public interface Task2<I1, I2, O>
 
     /**
      * Fixes the first argument and returns another task that represents the second argument.
+     *
+     * @param i1 The value of the first argument
+     *
+     * @return new task with fixed first argument
      */
     default Task1<I2, O> partialApply(I1 i1)
     {
