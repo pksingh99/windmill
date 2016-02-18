@@ -2,15 +2,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>io.windmill</groupId>
+        <groupId>com.github.xedin</groupId>
         <artifactId>windmill-parent</artifactId>
         <version>0.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>windmill-examples</artifactId>
-
-    <packaging>pom</packaging>
-
+    <packaging>jar</packaging>
     <name>Windmill Examples</name>
     <url>http://github.com/xedin/windmill</url>
 
@@ -18,7 +16,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <modules>
-      <module>kvs</module>
-    </modules>
+    <dependencies>
+        <dependency>
+            <groupId>com.github.xedin</groupId>
+            <artifactId>windmill-core</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+    </dependencies>
 </project>

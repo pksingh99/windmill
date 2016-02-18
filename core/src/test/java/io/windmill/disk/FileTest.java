@@ -242,7 +242,7 @@ public class FileTest
         pageTracker.invalidate(new PageRef(file, evictedOffset));
 
         // because we can't track when page is actually evicted since it's async
-        Futures.sleepUninterruptibly(10, TimeUnit.MILLISECONDS);
+        Futures.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
 
         Assert.assertEquals(2, pageTracker.estimatedSize());
 
