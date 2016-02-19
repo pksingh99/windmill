@@ -2,8 +2,18 @@
 
 [![Build Status](https://travis-ci.org/xedin/windmill.svg?branch=master)](https://travis-ci.org/xedin/windmill)
 
-Windmill is a Java 8 library for building high-performance applications
-using the "Thread-per-Core" or "Shared-Nothing" architecture.
+Windmill is a Java 8 library for building high-performance
+applications using the "Thread-per-Core" or "Shared-Nothing"
+architecture. It is hosted on
+[Maven Central](http://search.maven.org/#artifactdetails%7Ccom.github.xedin%7Cwindmill-core%7C0.1%7Cjar):
+
+```
+<dependency>
+  <groupId>com.github.xedin</groupId>
+  <artifactId>windmill-core</artifactId>
+  <version>0.1</version>
+</dependency>
+```
 
 ## Background
 
